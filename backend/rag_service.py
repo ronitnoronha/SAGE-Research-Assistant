@@ -121,20 +121,21 @@ class SupabaseRAGService:
             }
         ).execute()
 
-        matches = rpc_res.data or []
+        # Filter out boilerplate metadata (disclosures, acknowledgments, references)
+        filtered_matches = []
+        for item in matches:
+            content_lower = item.get("content", "").lower()
+            if any(skip_word in content_lower for skip_word in ["disclosures j.r.", "funding this work", "conflict of interest statement"]):
+                continue
+            filtered_matches.append(item)
 
-        if not matches:
-            return {
-                "answer": "No relevant evidence found in the research papers stored on Supabase.",
-                "sources": [],
-                "mode": "extractive_fallback"
-            }
+        matches_to_use = filtered_matches if filtered_matches else matches
 
         # 3. Build context & source list
         context_blocks = []
         sources = []
 
-        for item in matches:
+        for item in matches_to_use[:4]:
             content = item.get("content", "")
             meta = item.get("metadata", {})
             context_blocks.append(content)
@@ -148,9 +149,9 @@ class SupabaseRAGService:
 
         # 4. Generate answer via Cloud LLM API or Extractive Fallback
         if self.llm:
-            prompt = f"""You are SAGE, a medical research assistant. Analyze the medical evidence context and answer the user question accurately with clinical clarity.
+            prompt = f"""You are SAGE, an expert medical research assistant. Synthesize a clear, accurate, and comprehensive medical answer to the user's question based on the provided research paper context.
 
-MEDICAL CONTEXT:
+RESEARCH CONTEXT:
 {context_str}
 
 USER QUESTION:
@@ -163,10 +164,10 @@ ANSWER:"""
                 mode = "gemini_cloud"
             except Exception as e:
                 print(f"⚠️ Cloud LLM generation failed: {e}")
-                answer = self._extractive_synthesis(question, matches)
+                answer = self._extractive_synthesis(question, matches_to_use)
                 mode = "extractive_fallback"
         else:
-            answer = self._extractive_synthesis(question, matches)
+            answer = self._extractive_synthesis(question, matches_to_use)
             mode = "extractive_fallback"
 
         return {
