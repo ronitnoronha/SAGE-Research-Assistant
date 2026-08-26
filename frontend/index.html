@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAGE - AI Medical Research Assistant</title>
+    <meta name="description" content="Interactive AI Medical Research Assistant powered by Netlify, Supabase pgvector, and clinical document RAG.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation & Library -->
+        <aside class="sidebar">
+            <div class="brand-header">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <div class="brand-title">
+                    <h2>SAGE</h2>
+                    <span>Medical AI RAG</span>
+                </div>
+            </div>
+
+            <div class="status-badge" id="system-status">
+                <span class="status-dot warning"></span>
+                <span class="status-text">Checking API...</span>
+            </div>
+
+            <!-- PDF Upload Section -->
+            <div class="sidebar-section">
+                <h3><i class="fa-solid fa-file-pdf"></i> Research Documents</h3>
+                <p class="section-desc">Upload clinical papers to index into Supabase Vector DB.</p>
+                
+                <label for="pdf-file-input" class="upload-btn">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Upload Medical PDF
+                    <input type="file" id="pdf-file-input" accept=".pdf" style="display: none;">
+                </label>
+                <div id="upload-status" class="upload-status"></div>
+            </div>
+
+            <!-- Document List -->
+            <div class="sidebar-section list-section">
+                <h3><i class="fa-solid fa-layer-group"></i> Indexed Library</h3>
+                <div id="document-list" class="document-list">
+                    <div class="empty-docs">No documents indexed yet.</div>
+                </div>
+            </div>
+
+            <!-- Deployment Badges -->
+            <div class="sidebar-footer">
+                <div class="tech-stack">
+                    <span class="badge netlify"><i class="fa-solid fa-bolt"></i> Netlify</span>
+                    <span class="badge supabase"><i class="fa-solid fa-database"></i> Supabase</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat & Content Area -->
+        <main class="main-content">
+            <!-- Header Bar -->
+            <header class="top-header">
+                <div class="header-info">
+                    <h1>🐼 Medical Research Assistant</h1>
+                    <p>Evidence-based clinical query system powered by Supabase <code>pgvector</code></p>
+                </div>
+                <div class="header-actions">
+                    <button class="icon-btn" id="btn-clear-chat" title="Clear Conversation">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                    <button class="icon-btn" id="btn-api-config" title="API Settings">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Chat Window -->
+            <div class="chat-container" id="chat-messages">
+                <!-- Welcome Screen Card -->
+                <div class="welcome-card" id="welcome-screen">
+                    <div class="welcome-icon">
+                        <i class="fa-solid fa-stethoscope"></i>
+                    </div>
+                    <h2>Welcome to SAGE Medical AI</h2>
+                    <p>Ask questions about clinical guidelines, diagnosis protocol, and medical research papers.</p>
+                    
+                    <div class="feature-grid">
+                        <div class="feature-item" id="sample-q1">
+                            <i class="fa-solid fa-syringe"></i>
+                            <h4>Diabetes Guidelines</h4>
+                            <p>"What is the recommended first-line treatment for Type 2 Diabetes?"</p>
+                        </div>
+                        <div class="feature-item" id="sample-q2">
+                            <i class="fa-solid fa-heart-pulse"></i>
+                            <h4>Diagnostic Criteria</h4>
+                            <p>"What are the HbA1c diagnostic thresholds for diabetes?"</p>
+                        </div>
+                        <div class="feature-item" id="sample-q3">
+                            <i class="fa-solid fa-book-medical"></i>
+                            <h4>Clinical Evidence</h4>
+                            <p>"Summarize key risk factors mentioned in uploaded papers."</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input Form -->
+            <div class="input-container">
+                <form id="chat-form">
+                    <input type="text" id="user-input" placeholder="Ask a medical research question..." autocomplete="off">
+                    <button type="submit" id="send-btn">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <!-- API Config Modal -->
+    <div class="modal-overlay" id="config-modal">
+        <div class="modal-card">
+            <h3><i class="fa-solid fa-sliders"></i> Backend API Connection</h3>
+            <p>Enter your backend API endpoint URL (e.g. Render, Railway, or local server).</p>
+            <div class="form-group">
+                <label for="api-url-input">API Base URL:</label>
+                <input type="text" id="api-url-input" placeholder="http://localhost:8000">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="btn-modal-cancel">Cancel</button>
+                <button class="btn btn-primary" id="btn-modal-save">Save Endpoint</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
