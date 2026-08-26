@@ -4,7 +4,6 @@ import io
 import json
 from typing import List, Dict, Any, Optional
 from pypdf import PdfReader
-from sentence_transformers import SentenceTransformer
 from supabase import create_client, Client
 import google.generativeai as genai
 
@@ -33,6 +32,7 @@ class SupabaseRAGService:
             print("⚡ Loading embedding model (sentence-transformers/all-MiniLM-L6-v2)...")
             import torch
             torch.set_num_threads(1)
+            from sentence_transformers import SentenceTransformer
             self._encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         return self._encoder
 
