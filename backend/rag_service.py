@@ -160,10 +160,14 @@ USER QUESTION:
 ANSWER:"""
             try:
                 response = self.llm.generate_content(prompt)
-                answer = response.text
-                mode = "gemini_cloud"
+                if response and hasattr(response, 'text') and response.text:
+                    answer = response.text
+                    mode = "gemini_cloud"
+                else:
+                    answer = self._extractive_synthesis(question, matches_to_use)
+                    mode = "extractive_fallback"
             except Exception as e:
-                print(f"⚠️ Cloud LLM generation failed: {e}")
+                print(f"⚠️ Gemini Cloud LLM generation failed: {e}", flush=True)
                 answer = self._extractive_synthesis(question, matches_to_use)
                 mode = "extractive_fallback"
         else:
