@@ -27,14 +27,18 @@ class SupabaseRAGService:
             self.llm = None
 
     def get_encoder(self):
-        """Lazy load embedding model on demand with CPU memory optimizations"""
+        """Lazy load lightweight ONNX embedding model (fastembed) using <50MB RAM"""
         if self._encoder is None:
-            print("⚡ Loading embedding model (sentence-transformers/all-MiniLM-L6-v2)...")
-            import torch
-            torch.set_num_threads(1)
-            from sentence_transformers import SentenceTransformer
-            self._encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+            print("⚡ Loading ultra-lightweight ONNX embedding model (fastembed BAAI/bge-small-en-v1.5)...")
+            from fastembed import TextEmbedding
+            self._encoder = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
         return self._encoder
+
+    def encode_text(self, text: str) -> List[float]:
+        """Generate 384-dimensional vector embedding using fastembed"""
+        encoder = self.get_encoder()
+        embeddings = list(encoder.embed([text]))
+        return [float(x) for x in embeddings[0]]
 
     def chunk_text(self, text: str, chunk_size: int = 800, overlap: int = 150) -> List[str]:
         """Split document text into overlapping chunks"""
@@ -76,7 +80,7 @@ class SupabaseRAGService:
             chunks = self.chunk_text(text)
             for chunk in chunks:
                 # Generate embedding vector (384 float dimensions)
-                embedding = self.get_encoder().encode(chunk).tolist()
+                embedding = self.encode_text(chunk)
 
                 # Insert chunk into Supabase Postgres documents table
                 record = {
@@ -105,7 +109,7 @@ class SupabaseRAGService:
             raise RuntimeError("Supabase client not configured.")
 
         # 1. Compute embedding for question
-        query_embedding = self.get_encoder().encode(question).tolist()
+        query_embedding = self.encode_text(question)
 
         # 2. RPC call to match_documents in Supabase
         rpc_res = self.client.rpc(
