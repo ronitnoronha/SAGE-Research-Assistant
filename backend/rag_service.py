@@ -18,9 +18,7 @@ class SupabaseRAGService:
         if self.supabase_url and self.supabase_key:
             self.client = create_client(self.supabase_url, self.supabase_key)
 
-        # Initialize local fast embedding model (384 dimensions)
-        print("⚡ Loading embedding model (sentence-transformers/all-MiniLM-L6-v2)...")
-        self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        self._encoder = None
 
         # Initialize Gemini if key exists
         if self.gemini_api_key:
@@ -28,6 +26,15 @@ class SupabaseRAGService:
             self.llm = genai.GenerativeModel('gemini-1.5-flash')
         else:
             self.llm = None
+
+    def get_encoder(self):
+        """Lazy load embedding model on demand with CPU memory optimizations"""
+        if self._encoder is None:
+            print("⚡ Loading embedding model (sentence-transformers/all-MiniLM-L6-v2)...")
+            import torch
+            torch.set_num_threads(1)
+            self._encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        return self._encoder
 
     def chunk_text(self, text: str, chunk_size: int = 800, overlap: int = 150) -> List[str]:
         """Split document text into overlapping chunks"""
@@ -69,7 +76,7 @@ class SupabaseRAGService:
             chunks = self.chunk_text(text)
             for chunk in chunks:
                 # Generate embedding vector (384 float dimensions)
-                embedding = self.encoder.encode(chunk).tolist()
+                embedding = self.get_encoder().encode(chunk).tolist()
 
                 # Insert chunk into Supabase Postgres documents table
                 record = {
@@ -98,7 +105,7 @@ class SupabaseRAGService:
             raise RuntimeError("Supabase client not configured.")
 
         # 1. Compute embedding for question
-        query_embedding = self.encoder.encode(question).tolist()
+        query_embedding = self.get_encoder().encode(question).tolist()
 
         # 2. RPC call to match_documents in Supabase
         rpc_res = self.client.rpc(
