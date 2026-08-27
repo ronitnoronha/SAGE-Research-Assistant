@@ -170,10 +170,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const bubble = row.querySelector(".message-bubble");
         
-        let formattedText = answerText
-            .replace(/\n\n/g, "<br><br>")
-            .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-            .replace(/\*(.*?)\*/g, "<em>$1</em>");
+        let formattedText = "";
+        if (typeof marked !== "undefined" && marked.parse) {
+            formattedText = marked.parse(answerText);
+        } else {
+            formattedText = answerText
+                .replace(/\n\n/g, "<br><br>")
+                .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+        }
 
         let sourcesHtml = "";
         if (sources && sources.length > 0) {
