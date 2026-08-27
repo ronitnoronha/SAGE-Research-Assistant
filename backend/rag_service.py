@@ -161,12 +161,14 @@ class SupabaseRAGService:
         sources = []
 
         for item in matches_to_use:
-            content = item.get("content", "")
-            meta = item.get("metadata", {})
+            content = str(item.get("content") or "")
+            meta = item.get("metadata") or {}
+            if not isinstance(meta, dict):
+                meta = {}
             context_blocks.append(content)
             sources.append({
-                "source": meta.get("source", "Research Paper"),
-                "page": meta.get("page", 1),
+                "source": str(meta.get("source") or "Research Paper"),
+                "page": int(meta.get("page") or 1),
                 "content": content[:300] + "..." if len(content) > 300 else content
             })
 

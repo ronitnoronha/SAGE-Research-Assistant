@@ -61,7 +61,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/query", response_model=QueryResponse)
+@app.post("/query")
 def query_medical_rag(request: QueryRequest):
     """Perform RAG vector query against Supabase"""
     if not request.question.strip():
