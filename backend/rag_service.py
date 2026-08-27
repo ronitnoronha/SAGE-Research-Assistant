@@ -193,10 +193,11 @@ ANSWER:"""
         mode = "extractive_fallback"
         import requests
 
-        # Provider 1: Groq API (LLaMA 3.3 70B - 14,400 requests/day free!)
-        groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
+        # Provider 1: Groq API (High-quota 14,400 requests/day free!)
+        groq_key = (os.getenv("GROQ_API_KEY") or "").strip().replace("GROQ_API_KEY=", "").replace('"', '').replace("'", "")
         if groq_key and "your-groq-api-key" not in groq_key:
-            for g_model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]:
+            groq_models = ["qwen/qwen3.6-27b", "qwen/qwen3.8-27b", "openai/gpt-oss-120b", "groq/compound-mini"]
+            for g_model in groq_models:
                 try:
                     url = "https://api.groq.com/openai/v1/chat/completions"
                     headers = {
@@ -215,6 +216,9 @@ ANSWER:"""
                         choices = res_data.get("choices", [])
                         if choices:
                             text_out = choices[0].get("message", {}).get("content", "").strip()
+                            # Strip thinking tags if present
+                            if "<think>" in text_out and "</think>" in text_out:
+                                text_out = text_out.split("</think>")[-1].strip()
                             if text_out:
                                 answer = text_out
                                 mode = f"groq_{g_model}"
