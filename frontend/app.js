@@ -1,8 +1,7 @@
 // app.js - FRONTEND CONTROLLER FOR SAGE RESEARCH ASSISTANT WITH SUPABASE AUTH
 document.addEventListener("DOMContentLoaded", () => {
-    // Default Production Backend Endpoint
-    const DEFAULT_API_URL = "https://sage-research-assistant.onrender.com";
-    let apiBaseUrl = localStorage.getItem("sage_api_url") || DEFAULT_API_URL;
+    // Permanent Production Backend Endpoint
+    const apiBaseUrl = "https://sage-research-assistant.onrender.com";
 
     // Supabase Auth Client
     const SUPABASE_URL = "https://vvpstsihxzoselrunhwy.supabase.co";
@@ -26,11 +25,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatForm = document.getElementById("chat-form");
     const userInput = document.getElementById("user-input");
     const btnClearChat = document.getElementById("btn-clear-chat");
-    const btnApiConfig = document.getElementById("btn-api-config");
-    const configModal = document.getElementById("config-modal");
-    const apiUrlInput = document.getElementById("api-url-input");
-    const btnModalSave = document.getElementById("btn-modal-save");
-    const btnModalCancel = document.getElementById("btn-modal-cancel");
 
     // Auth Elements
     const authHeaderContainer = document.getElementById("auth-header-container");
@@ -381,24 +375,5 @@ document.addEventListener("DOMContentLoaded", () => {
             welcomeScreen.style.display = "block";
             chatMessages.appendChild(welcomeScreen);
         }
-    });
-
-    // API Config Modal Actions
-    btnApiConfig.addEventListener("click", () => {
-        apiUrlInput.value = apiBaseUrl;
-        configModal.classList.add("active");
-    });
-
-    btnModalCancel.addEventListener("click", () => configModal.classList.remove("active"));
-    
-    btnModalSave.addEventListener("click", () => {
-        const newUrl = apiUrlInput.value.trim();
-        if (newUrl) {
-            apiBaseUrl = newUrl;
-            localStorage.setItem("sage_api_url", newUrl);
-            checkApiHealth();
-            fetchDocuments();
-        }
-        configModal.classList.remove("active");
     });
 });
