@@ -187,6 +187,7 @@ INSTRUCTIONS:
 2. Include specific numbers, criteria, and recommendations
 3. If information is missing, say what you found and what's missing
 4. Be precise and cite details from the papers
+5. Provide ONLY the final medical answer. DO NOT include any self-checks, verification steps, instruction checklists, or meta-notes in your response.
 
 ANSWER:"""
         answer = None
@@ -222,11 +223,29 @@ ANSWER:"""
                                     text_out = text_out.split("</think>")[-1].strip()
                                 else:
                                     text_out = text_out.split("<think>")[-1].strip()
-                            if "thinking process" in text_out.lower():
+
+                            # Strip leading thinking process header
+                            if "thinking process" in text_out.lower()[:300]:
                                 for marker in ["###", "Based on", "Definition &", "1. ", "Insulin is"]:
-                                    if marker in text_out and text_out.find(marker) > 20:
+                                    if marker in text_out and text_out.find(marker) > 10:
                                         text_out = marker + text_out.split(marker, 1)[-1]
                                         break
+
+                            # Strip trailing self-checks / verification blocks
+                            for cut_marker in [
+                                "Check Against Instructions",
+                                "Self-Correction",
+                                "Self-Verification",
+                                "Verification during thought",
+                                "All constraints met",
+                                "Proceed. Output generation",
+                                "[Output matches",
+                                "Structure in output:"
+                            ]:
+                                idx = text_out.lower().find(cut_marker.lower())
+                                if idx != -1:
+                                    text_out = text_out[:idx].strip()
+
                             if text_out:
                                 answer = text_out
                                 mode = f"groq_{g_model}"
