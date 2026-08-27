@@ -105,48 +105,61 @@ class SupabaseRAGService:
             "chunks_inserted": len(all_records)
         }
 
+    def get_enhanced_matches(self, question: str) -> List[Dict[str, Any]]:
+        """Multi-strategy search matching original rag_system.py precision"""
+        search_queries = [
+            question,
+            question + " treatment medication criteria",
+            question + " diagnosis findings recommendations"
+        ]
+
+        all_matches = []
+        seen_snippets = set()
+
+        for q in search_queries:
+            try:
+                emb = self.encode_text(q)
+                rpc_res = self.client.rpc(
+                    "match_documents",
+                    {
+                        "query_embedding": emb,
+                        "match_threshold": 0.15,
+                        "match_count": 4
+                    }
+                ).execute()
+
+                matches = rpc_res.data or []
+                for item in matches:
+                    snippet = item.get("content", "")[:100]
+                    content_lower = item.get("content", "").lower()
+                    if snippet not in seen_snippets and not any(skip in content_lower for skip in ["disclosures j.r.", "funding this work", "conflict of interest statement"]):
+                        seen_snippets.add(snippet)
+                        all_matches.append(item)
+            except Exception as e:
+                print(f"⚠️ Search strategy warning for '{q}': {e}", flush=True)
+
+        return all_matches[:6]
+
     def query_rag(self, question: str, match_count: int = 5) -> Dict[str, Any]:
-        """Perform Vector similarity search on Supabase & generate answer"""
+        """Perform Vector similarity search on Supabase & generate structured medical answer"""
         if not self.client:
             raise RuntimeError("Supabase client not configured.")
 
-        # 1. Compute embedding for question
-        query_embedding = self.encode_text(question)
+        # 1. Multi-strategy search (exact match to original rag_system.py)
+        matches_to_use = self.get_enhanced_matches(question)
 
-        # 2. RPC call to match_documents in Supabase
-        rpc_res = self.client.rpc(
-            "match_documents",
-            {
-                "query_embedding": query_embedding,
-                "match_threshold": 0.2,
-                "match_count": match_count
-            }
-        ).execute()
-
-        matches = rpc_res.data or []
-
-        if not matches:
+        if not matches_to_use:
             return {
                 "answer": "No relevant evidence found in the research papers stored on Supabase.",
                 "sources": [],
                 "mode": "extractive_fallback"
             }
 
-        # Filter out boilerplate metadata (disclosures, acknowledgments, references)
-        filtered_matches = []
-        for item in matches:
-            content_lower = item.get("content", "").lower()
-            if any(skip_word in content_lower for skip_word in ["disclosures j.r.", "funding this work", "conflict of interest statement"]):
-                continue
-            filtered_matches.append(item)
-
-        matches_to_use = filtered_matches if filtered_matches else matches
-
-        # 3. Build context & source list
+        # 2. Build context & source list
         context_blocks = []
         sources = []
 
-        for item in matches_to_use[:4]:
+        for item in matches_to_use:
             content = item.get("content", "")
             meta = item.get("metadata", {})
             context_blocks.append(content)
@@ -158,7 +171,7 @@ class SupabaseRAGService:
 
         context_str = "\n\n".join(context_blocks)
 
-        # 4. Generate answer via Cloud LLM API or Extractive Fallback
+        # 3. Restored exact original Prompt Template from rag_system.py
         active_key = (os.getenv("GEMINI_API_KEY") or self.gemini_api_key or "").strip()
         is_valid_key = (
             active_key != ""
@@ -166,24 +179,35 @@ class SupabaseRAGService:
         )
 
         if is_valid_key:
-            prompt = f"""You are SAGE, an expert medical research assistant. Synthesize a clear, accurate, and comprehensive medical answer to the user's question based on the provided research paper context.
+            prompt = f"""You are a medical research expert. Analyze the following research papers and provide a comprehensive answer.
 
 RESEARCH CONTEXT:
 {context_str}
 
-USER QUESTION:
-{question}
+QUESTION: {question}
+
+INSTRUCTIONS:
+1. Extract ALL relevant information from the research context
+2. Include specific numbers, criteria, and recommendations
+3. If information is missing, say what you found and what's missing
+4. Be precise and cite details from the papers
 
 ANSWER:"""
             answer = None
+            errors_logged = []
             
-            # Method 1: Direct HTTP REST API (fastest, most reliable, no SDK version issues)
+            # Stable high-quota production models first (1500 req/day)
             import requests
-            for model_name in ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-pro']:
+            model_candidates = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-pro']
+            
+            for model_name in model_candidates:
                 try:
                     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={active_key}"
                     headers = {"Content-Type": "application/json"}
-                    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                    payload = {
+                        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048}
+                    }
                     
                     res = requests.post(url, headers=headers, json=payload, timeout=12)
                     if res.status_code == 200:
@@ -196,15 +220,23 @@ ANSWER:"""
                                 mode = f"gemini_{model_name}_api"
                                 print(f"✅ Gemini REST response generated with {model_name}", flush=True)
                                 break
+                    elif res.status_code == 429:
+                        msg = f"Model {model_name}: HTTP 429 Rate Limit Exceeded"
+                        errors_logged.append(msg)
+                        print(f"⚠️ {msg}", flush=True)
                     else:
-                        print(f"⚠️ Gemini REST model {model_name} HTTP {res.status_code}: {res.text[:100]}", flush=True)
+                        msg = f"Model {model_name}: HTTP {res.status_code} ({res.text[:100]})"
+                        errors_logged.append(msg)
+                        print(f"⚠️ {msg}", flush=True)
                 except Exception as e:
-                    print(f"⚠️ Gemini REST call failed for {model_name}: {e}", flush=True)
+                    msg = f"Model {model_name}: Call Exception ({e})"
+                    errors_logged.append(msg)
+                    print(f"⚠️ {msg}", flush=True)
                     continue
 
             # Method 2: SDK Fallback if REST didn't return text
             if not answer:
-                for model_name in ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-pro']:
+                for model_name in ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-pro']:
                     try:
                         llm = genai.GenerativeModel(model_name)
                         response = llm.generate_content(prompt)
@@ -213,15 +245,18 @@ ANSWER:"""
                             mode = f"gemini_{model_name}_sdk"
                             break
                     except Exception as e:
-                        print(f"⚠️ SDK model {model_name} failed: {e}", flush=True)
+                        msg = f"SDK Model {model_name}: Failed ({e})"
+                        errors_logged.append(msg)
+                        print(f"⚠️ {msg}", flush=True)
                         continue
 
             if not answer:
-                answer = self._extractive_synthesis(question, matches_to_use)
-                mode = "extractive_fallback"
+                err_msg = "❌ **LLM GENERATION ERROR**: Could not generate answer using Gemini models.\n\n**Diagnostic Errors:**\n" + "\n".join(errors_logged)
+                mode = "llm_generation_error"
         else:
-            answer = self._extractive_synthesis(question, matches_to_use)
-            mode = "extractive_fallback"
+            err_msg = f"❌ **GEMINI KEY MISSING / INVALID**: Key read from environment is '{active_key[:10]}...'. Please ensure GEMINI_API_KEY is saved in Render Environment Variables."
+            answer = err_msg
+            mode = "api_key_invalid"
 
         return {
             "answer": answer,
