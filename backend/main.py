@@ -71,7 +71,14 @@ def query_medical_rag(request: QueryRequest):
         result = rag_service.query_rag(request.question)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        err_detail = f"⚠️ Server Error processing query: {str(e)}\n\n{traceback.format_exc()}"
+        print(f"❌ Exception in /query: {err_detail}", flush=True)
+        return {
+            "answer": err_detail,
+            "sources": [],
+            "mode": "error"
+        }
 
 @app.get("/documents")
 def get_documents():

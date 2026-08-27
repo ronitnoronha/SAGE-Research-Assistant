@@ -130,9 +130,10 @@ class SupabaseRAGService:
 
                 matches = rpc_res.data or []
                 for item in matches:
-                    snippet = item.get("content", "")[:100]
-                    content_lower = item.get("content", "").lower()
-                    if snippet not in seen_snippets and not any(skip in content_lower for skip in ["disclosures j.r.", "funding this work", "conflict of interest statement"]):
+                    content_text = item.get("content") or ""
+                    snippet = content_text[:100]
+                    content_lower = content_text.lower()
+                    if snippet and snippet not in seen_snippets and not any(skip in content_lower for skip in ["disclosures j.r.", "funding this work", "conflict of interest statement"]):
                         seen_snippets.add(snippet)
                         all_matches.append(item)
             except Exception as e:
