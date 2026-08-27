@@ -262,12 +262,11 @@ ANSWER:"""
                         continue
 
             if not answer:
-                answer = "❌ **LLM GENERATION ERROR**: Could not generate answer using Gemini models.\n\n**Diagnostic Errors:**\n" + "\n".join(errors_logged)
-                mode = "llm_generation_error"
+                answer = self._extractive_synthesis(question, matches_to_use)
+                mode = "extractive_quota_fallback"
         else:
-            err_msg = f"❌ **GEMINI KEY MISSING / INVALID**: Key read from environment is '{active_key[:10]}...'. Please ensure GEMINI_API_KEY is saved in Render Environment Variables."
-            answer = err_msg
-            mode = "api_key_invalid"
+            answer = self._extractive_synthesis(question, matches_to_use)
+            mode = "extractive_fallback"
 
         return {
             "answer": answer,
