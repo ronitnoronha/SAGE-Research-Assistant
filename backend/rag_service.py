@@ -159,7 +159,7 @@ class SupabaseRAGService:
         context_str = "\n\n".join(context_blocks)
 
         # 4. Generate answer via Cloud LLM API or Extractive Fallback
-        if self.llm:
+        if self.gemini_api_key:
             prompt = f"""You are SAGE, an expert medical research assistant. Synthesize a clear, accurate, and comprehensive medical answer to the user's question based on the provided research paper context.
 
 RESEARCH CONTEXT:
@@ -169,16 +169,23 @@ USER QUESTION:
 {question}
 
 ANSWER:"""
-            try:
-                response = self.llm.generate_content(prompt)
-                if response and hasattr(response, 'text') and response.text:
-                    answer = response.text
-                    mode = "gemini_cloud"
-                else:
-                    answer = self._extractive_synthesis(question, matches_to_use)
-                    mode = "extractive_fallback"
-            except Exception as e:
-                print(f"⚠️ Gemini Cloud LLM generation failed: {e}", flush=True)
+            answer = None
+            model_candidates = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-pro']
+            
+            for model_name in model_candidates:
+                try:
+                    llm = genai.GenerativeModel(model_name)
+                    response = llm.generate_content(prompt)
+                    if response and hasattr(response, 'text') and response.text:
+                        answer = response.text
+                        mode = f"gemini_{model_name}"
+                        print(f"✅ Gemini response generated with {model_name}", flush=True)
+                        break
+                except Exception as e:
+                    print(f"⚠️ Gemini model {model_name} unreachable: {e}", flush=True)
+                    continue
+
+            if not answer:
                 answer = self._extractive_synthesis(question, matches_to_use)
                 mode = "extractive_fallback"
         else:
