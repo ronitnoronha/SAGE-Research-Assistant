@@ -123,6 +123,15 @@ class SupabaseRAGService:
             }
         ).execute()
 
+        matches = rpc_res.data or []
+
+        if not matches:
+            return {
+                "answer": "No relevant evidence found in the research papers stored on Supabase.",
+                "sources": [],
+                "mode": "extractive_fallback"
+            }
+
         # Filter out boilerplate metadata (disclosures, acknowledgments, references)
         filtered_matches = []
         for item in matches:
