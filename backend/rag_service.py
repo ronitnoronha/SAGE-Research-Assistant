@@ -159,7 +159,13 @@ class SupabaseRAGService:
         context_str = "\n\n".join(context_blocks)
 
         # 4. Generate answer via Cloud LLM API or Extractive Fallback
-        if self.gemini_api_key:
+        is_valid_key = (
+            self.gemini_api_key
+            and self.gemini_api_key.strip() != ""
+            and "your-google-gemini-api-key" not in self.gemini_api_key
+        )
+
+        if is_valid_key:
             prompt = f"""You are SAGE, an expert medical research assistant. Synthesize a clear, accurate, and comprehensive medical answer to the user's question based on the provided research paper context.
 
 RESEARCH CONTEXT:
@@ -170,20 +176,45 @@ USER QUESTION:
 
 ANSWER:"""
             answer = None
-            model_candidates = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-pro']
             
-            for model_name in model_candidates:
+            # Method 1: Direct HTTP REST API (fastest, most reliable, no SDK version issues)
+            import requests
+            for model_name in ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']:
                 try:
-                    llm = genai.GenerativeModel(model_name)
-                    response = llm.generate_content(prompt)
-                    if response and hasattr(response, 'text') and response.text:
-                        answer = response.text
-                        mode = f"gemini_{model_name}"
-                        print(f"✅ Gemini response generated with {model_name}", flush=True)
-                        break
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.gemini_api_key.strip()}"
+                    headers = {"Content-Type": "application/json"}
+                    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                    
+                    res = requests.post(url, headers=headers, json=payload, timeout=12)
+                    if res.status_code == 200:
+                        res_data = res.json()
+                        candidates = res_data.get("candidates", [])
+                        if candidates:
+                            parts = candidates[0].get("content", {}).get("parts", [])
+                            if parts and "text" in parts[0]:
+                                answer = parts[0]["text"]
+                                mode = f"gemini_{model_name}_api"
+                                print(f"✅ Gemini REST response generated with {model_name}", flush=True)
+                                break
+                    else:
+                        print(f"⚠️ Gemini REST model {model_name} HTTP {res.status_code}: {res.text[:100]}", flush=True)
                 except Exception as e:
-                    print(f"⚠️ Gemini model {model_name} unreachable: {e}", flush=True)
+                    print(f"⚠️ Gemini REST call failed for {model_name}: {e}", flush=True)
                     continue
+
+            # Method 2: SDK Fallback if REST didn't return text
+            if not answer:
+                for model_name in ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']:
+                    try:
+                        llm = genai.GenerativeModel(model_name)
+                        response = llm.generate_content(prompt)
+                        if response and hasattr(response, 'text') and response.text:
+                            answer = response.text
+                            mode = f"gemini_{model_name}_sdk"
+                            break
+                    except Exception as e:
+                        print(f"⚠️ SDK model {model_name} failed: {e}", flush=True)
+                        continue
 
             if not answer:
                 answer = self._extractive_synthesis(question, matches_to_use)
