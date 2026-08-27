@@ -217,12 +217,20 @@ ANSWER:"""
                         res_data = res.json()
                         candidates = res_data.get("candidates", [])
                         if candidates:
-                            parts = candidates[0].get("content", {}).get("parts", [])
-                            if parts and "text" in parts[0]:
+                            first_cand = candidates[0]
+                            parts = first_cand.get("content", {}).get("parts", [])
+                            if parts and "text" in parts[0] and parts[0]["text"].strip():
                                 answer = parts[0]["text"]
                                 mode = f"gemini_{model_name}_api"
                                 print(f"✅ Gemini REST response generated with {model_name}", flush=True)
                                 break
+                            else:
+                                reason = first_cand.get("finishReason", "UNKNOWN")
+                                msg = f"Model {model_name}: HTTP 200 but text empty (finishReason: {reason})"
+                                errors_logged.append(msg)
+                        else:
+                            msg = f"Model {model_name}: HTTP 200 but 0 candidates returned"
+                            errors_logged.append(msg)
                     elif res.status_code == 429:
                         msg = f"Model {model_name}: HTTP 429 Rate Limit Exceeded"
                         errors_logged.append(msg)
@@ -254,7 +262,7 @@ ANSWER:"""
                         continue
 
             if not answer:
-                err_msg = "❌ **LLM GENERATION ERROR**: Could not generate answer using Gemini models.\n\n**Diagnostic Errors:**\n" + "\n".join(errors_logged)
+                answer = "❌ **LLM GENERATION ERROR**: Could not generate answer using Gemini models.\n\n**Diagnostic Errors:**\n" + "\n".join(errors_logged)
                 mode = "llm_generation_error"
         else:
             err_msg = f"❌ **GEMINI KEY MISSING / INVALID**: Key read from environment is '{active_key[:10]}...'. Please ensure GEMINI_API_KEY is saved in Render Environment Variables."
