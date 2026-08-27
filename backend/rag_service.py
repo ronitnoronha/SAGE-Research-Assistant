@@ -216,9 +216,17 @@ ANSWER:"""
                         choices = res_data.get("choices", [])
                         if choices:
                             text_out = choices[0].get("message", {}).get("content", "").strip()
-                            # Strip thinking tags if present
-                            if "<think>" in text_out and "</think>" in text_out:
-                                text_out = text_out.split("</think>")[-1].strip()
+                            # Strip thinking/reasoning blocks if present
+                            if "<think>" in text_out:
+                                if "</think>" in text_out:
+                                    text_out = text_out.split("</think>")[-1].strip()
+                                else:
+                                    text_out = text_out.split("<think>")[-1].strip()
+                            if "thinking process" in text_out.lower():
+                                for marker in ["###", "Based on", "Definition &", "1. ", "Insulin is"]:
+                                    if marker in text_out and text_out.find(marker) > 20:
+                                        text_out = marker + text_out.split(marker, 1)[-1]
+                                        break
                             if text_out:
                                 answer = text_out
                                 mode = f"groq_{g_model}"
