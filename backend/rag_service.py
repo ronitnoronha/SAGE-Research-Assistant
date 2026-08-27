@@ -175,14 +175,7 @@ class SupabaseRAGService:
         context_str = "\n\n".join(context_blocks)
 
         # 3. Restored exact original Prompt Template from rag_system.py
-        active_key = (os.getenv("GEMINI_API_KEY") or self.gemini_api_key or "").strip()
-        is_valid_key = (
-            active_key != ""
-            and "your-google-gemini-api-key" not in active_key
-        )
-
-        if is_valid_key:
-            prompt = f"""You are a medical research expert. Analyze the following research papers and provide a comprehensive answer.
+        prompt = f"""You are a medical research expert. Analyze the following research papers and provide a comprehensive answer.
 
 RESEARCH CONTEXT:
 {context_str}
@@ -196,77 +189,80 @@ INSTRUCTIONS:
 4. Be precise and cite details from the papers
 
 ANSWER:"""
-            answer = None
-            errors_logged = []
-            
-            # Stable high-quota production models first (1500 req/day)
-            import requests
-            model_candidates = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-pro']
-            
-            for model_name in model_candidates:
+        answer = None
+        mode = "extractive_fallback"
+        import requests
+
+        # Provider 1: Groq API (LLaMA 3.3 70B - 14,400 requests/day free!)
+        groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
+        if groq_key and "your-groq-api-key" not in groq_key:
+            for g_model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]:
                 try:
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={active_key}"
-                    headers = {"Content-Type": "application/json"}
-                    payload = {
-                        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048}
+                    url = "https://api.groq.com/openai/v1/chat/completions"
+                    headers = {
+                        "Authorization": f"Bearer {groq_key}",
+                        "Content-Type": "application/json"
                     }
-                    
-                    res = requests.post(url, headers=headers, json=payload, timeout=12)
+                    payload = {
+                        "model": g_model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.2,
+                        "max_tokens": 2048
+                    }
+                    res = requests.post(url, headers=headers, json=payload, timeout=15)
                     if res.status_code == 200:
                         res_data = res.json()
-                        candidates = res_data.get("candidates", [])
-                        if candidates:
-                            first_cand = candidates[0]
-                            parts = first_cand.get("content", {}).get("parts", [])
-                            if parts and "text" in parts[0] and parts[0]["text"].strip():
-                                answer = parts[0]["text"]
-                                mode = f"gemini_{model_name}_api"
-                                print(f"✅ Gemini REST response generated with {model_name}", flush=True)
+                        choices = res_data.get("choices", [])
+                        if choices:
+                            text_out = choices[0].get("message", {}).get("content", "").strip()
+                            if text_out:
+                                answer = text_out
+                                mode = f"groq_{g_model}"
+                                print(f"✅ Groq response generated with {g_model}", flush=True)
                                 break
-                            else:
-                                reason = first_cand.get("finishReason", "UNKNOWN")
-                                msg = f"Model {model_name}: HTTP 200 but text empty (finishReason: {reason})"
-                                errors_logged.append(msg)
-                        else:
-                            msg = f"Model {model_name}: HTTP 200 but 0 candidates returned"
-                            errors_logged.append(msg)
-                    elif res.status_code == 429:
-                        msg = f"Model {model_name}: HTTP 429 Rate Limit Exceeded"
-                        errors_logged.append(msg)
-                        print(f"⚠️ {msg}", flush=True)
                     else:
-                        msg = f"Model {model_name}: HTTP {res.status_code} ({res.text[:100]})"
-                        errors_logged.append(msg)
-                        print(f"⚠️ {msg}", flush=True)
+                        print(f"⚠️ Groq model {g_model} HTTP {res.status_code}: {res.text[:100]}", flush=True)
                 except Exception as e:
-                    msg = f"Model {model_name}: Call Exception ({e})"
-                    errors_logged.append(msg)
-                    print(f"⚠️ {msg}", flush=True)
+                    print(f"⚠️ Groq call failed for {g_model}: {e}", flush=True)
                     continue
 
-            # Method 2: SDK Fallback if REST didn't return text
-            if not answer:
-                for model_name in ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-pro']:
+        # Provider 2: Google Gemini API (if Groq did not answer)
+        if not answer:
+            active_key = (os.getenv("GEMINI_API_KEY") or self.gemini_api_key or "").strip()
+            is_valid_key = (
+                active_key != ""
+                and "your-google-gemini-api-key" not in active_key
+            )
+            if is_valid_key:
+                model_candidates = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.6-flash']
+                for model_name in model_candidates:
                     try:
-                        llm = genai.GenerativeModel(model_name)
-                        response = llm.generate_content(prompt)
-                        if response and hasattr(response, 'text') and response.text:
-                            answer = response.text
-                            mode = f"gemini_{model_name}_sdk"
-                            break
+                        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={active_key}"
+                        headers = {"Content-Type": "application/json"}
+                        payload = {
+                            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048}
+                        }
+                        res = requests.post(url, headers=headers, json=payload, timeout=12)
+                        if res.status_code == 200:
+                            res_data = res.json()
+                            candidates = res_data.get("candidates", [])
+                            if candidates:
+                                first_cand = candidates[0]
+                                parts = first_cand.get("content", {}).get("parts", [])
+                                if parts and "text" in parts[0] and parts[0]["text"].strip():
+                                    answer = parts[0]["text"]
+                                    mode = f"gemini_{model_name}_api"
+                                    print(f"✅ Gemini response generated with {model_name}", flush=True)
+                                    break
                     except Exception as e:
-                        msg = f"SDK Model {model_name}: Failed ({e})"
-                        errors_logged.append(msg)
-                        print(f"⚠️ {msg}", flush=True)
+                        print(f"⚠️ Gemini call failed for {model_name}: {e}", flush=True)
                         continue
 
-            if not answer:
-                answer = self._extractive_synthesis(question, matches_to_use)
-                mode = "extractive_quota_fallback"
-        else:
+        # Provider 3: Extractive Fallback
+        if not answer:
             answer = self._extractive_synthesis(question, matches_to_use)
-            mode = "extractive_fallback"
+            mode = "extractive_quota_fallback"
 
         return {
             "answer": answer,
