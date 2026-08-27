@@ -542,3 +542,77 @@ body {
 
 .btn-secondary { background: rgba(255,255,255,0.1); color: white; }
 .btn-primary { background: var(--primary-gradient); color: white; }
+.btn-sm { padding: 6px 12px; font-size: 0.8rem; border-radius: 6px; }
+
+/* Auth Styles */
+.auth-card {
+    max-width: 420px;
+    padding: 0;
+    overflow: hidden;
+}
+
+.auth-tabs {
+    display: flex;
+    background: rgba(0, 0, 0, 0.4);
+    border-bottom: 1px solid var(--border);
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 14px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.auth-tab.active {
+    color: var(--primary);
+    border-bottom: 2px solid var(--primary);
+    background: rgba(6, 182, 212, 0.05);
+}
+
+.auth-form-container {
+    padding: 24px;
+}
+
+.auth-alert {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    margin-bottom: 16px;
+}
+
+.auth-alert.error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+}
+
+.auth-alert.success {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #6ee7b7;
+}
+
+.user-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(6, 182, 212, 0.12);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: var(--primary);
+}
+
+.user-badge span {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

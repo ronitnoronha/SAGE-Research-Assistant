@@ -36,6 +36,21 @@ class QueryResponse(BaseModel):
     sources: Optional[List[dict]] = None
     mode: Optional[str] = "supabase_pgvector"
 
+from fastapi import Header
+
+def get_current_user(authorization: Optional[str] = Header(None)):
+    """Extract and verify user session from Supabase Bearer token if present"""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization.replace("Bearer ", "").strip()
+    try:
+        if rag_service.client:
+            user_res = rag_service.client.auth.get_user(token)
+            return user_res.user if user_res else None
+    except Exception as e:
+        print(f"⚠️ Auth token verification note: {e}", flush=True)
+    return None
+
 @app.get("/")
 def root():
     return {

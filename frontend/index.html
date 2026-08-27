@@ -70,6 +70,11 @@
                     <p>Evidence-based clinical query system powered by Supabase <code>pgvector</code></p>
                 </div>
                 <div class="header-actions">
+                    <div id="auth-header-container">
+                        <button class="btn btn-primary btn-sm" id="btn-open-auth">
+                            <i class="fa-solid fa-user-lock"></i> Sign In / Register
+                        </button>
+                    </div>
                     <button class="icon-btn" id="btn-clear-chat" title="Clear Conversation">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
@@ -121,6 +126,38 @@
         </main>
     </div>
 
+    <!-- User Auth Modal -->
+    <div class="modal-overlay" id="auth-modal">
+        <div class="modal-card auth-card">
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tab-login">Sign In</button>
+                <button class="auth-tab" id="tab-signup">Create Account</button>
+            </div>
+            
+            <div class="auth-form-container">
+                <h3 id="auth-modal-title"><i class="fa-solid fa-lock"></i> Welcome Back</h3>
+                <p id="auth-modal-subtitle">Sign in to access medical AI search & PDF indexing</p>
+
+                <div id="auth-alert" class="auth-alert" style="display: none;"></div>
+
+                <form id="auth-form">
+                    <div class="form-group">
+                        <label for="auth-email"><i class="fa-solid fa-envelope"></i> Email Address</label>
+                        <input type="email" id="auth-email" placeholder="doctor@hospital.org" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="auth-password"><i class="fa-solid fa-key"></i> Password</label>
+                        <input type="password" id="auth-password" placeholder="••••••••••••" required autocomplete="current-password">
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" id="btn-auth-cancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="btn-auth-submit">Sign In</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- API Config Modal -->
     <div class="modal-overlay" id="config-modal">
         <div class="modal-card">
@@ -128,7 +165,7 @@
             <p>Enter your backend API endpoint URL (e.g. Render, Railway, or local server).</p>
             <div class="form-group">
                 <label for="api-url-input">API Base URL:</label>
-                <input type="text" id="api-url-input" placeholder="http://localhost:8000">
+                <input type="text" id="api-url-input" placeholder="https://sage-research-assistant.onrender.com">
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="btn-modal-cancel">Cancel</button>
@@ -137,6 +174,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="app.js"></script>
 </body>

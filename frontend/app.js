@@ -1,7 +1,20 @@
-// app.js - FRONTEND CONTROLLER FOR SAGE RESEARCH ASSISTANT
+// app.js - FRONTEND CONTROLLER FOR SAGE RESEARCH ASSISTANT WITH SUPABASE AUTH
 document.addEventListener("DOMContentLoaded", () => {
-    // API State
-    let apiBaseUrl = localStorage.getItem("sage_api_url") || "http://localhost:8000";
+    // Default Production Backend Endpoint
+    const DEFAULT_API_URL = "https://sage-research-assistant.onrender.com";
+    let apiBaseUrl = localStorage.getItem("sage_api_url") || DEFAULT_API_URL;
+
+    // Supabase Auth Client
+    const SUPABASE_URL = "https://vvpstsihxzoselrunhwy.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2cHN0c2loeHpvc2VscnVuaHd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NDUxNjcsImV4cCI6MjEwMzMyMTE2N30.6sPtn9Dpl0T8wwHGyf15LOVwa4iwSfFxKXqR_ddFXvo";
+    
+    let supabaseClient = null;
+    if (window.supabase) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
+    // User Session State
+    let currentUserSession = null;
 
     // DOM Elements
     const systemStatus = document.getElementById("system-status");
@@ -19,16 +32,158 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnModalSave = document.getElementById("btn-modal-save");
     const btnModalCancel = document.getElementById("btn-modal-cancel");
 
+    // Auth Elements
+    const authHeaderContainer = document.getElementById("auth-header-container");
+    const btnOpenAuth = document.getElementById("btn-open-auth");
+    const authModal = document.getElementById("auth-modal");
+    const tabLogin = document.getElementById("tab-login");
+    const tabSignup = document.getElementById("tab-signup");
+    const authForm = document.getElementById("auth-form");
+    const authModalTitle = document.getElementById("auth-modal-title");
+    const authModalSubtitle = document.getElementById("auth-modal-subtitle");
+    const authEmailInput = document.getElementById("auth-email");
+    const authPasswordInput = document.getElementById("auth-password");
+    const btnAuthSubmit = document.getElementById("btn-auth-submit");
+    const btnAuthCancel = document.getElementById("btn-auth-cancel");
+    const authAlert = document.getElementById("auth-alert");
+
+    let isSignUpMode = false;
+
     // Initialize
     checkApiHealth();
     fetchDocuments();
+    initAuthSession();
+
+    // Initialize Auth Session
+    async function initAuthSession() {
+        if (!supabaseClient) return;
+
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            updateAuthUI(session);
+
+            supabaseClient.auth.onAuthStateChange((_event, session) => {
+                updateAuthUI(session);
+            });
+        } catch (err) {
+            console.warn("Auth initialization error:", err);
+        }
+    }
+
+    function updateAuthUI(session) {
+        currentUserSession = session;
+        if (session && session.user) {
+            const email = session.user.email;
+            authHeaderContainer.innerHTML = `
+                <div class="user-badge" title="${email}">
+                    <i class="fa-solid fa-user-check"></i>
+                    <span>${email}</span>
+                    <button id="btn-signout" class="icon-btn" style="width:22px; height:22px; font-size:0.75rem;" title="Sign Out">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            `;
+            document.getElementById("btn-signout")?.addEventListener("click", async () => {
+                await supabaseClient?.auth.signOut();
+            });
+        } else {
+            authHeaderContainer.innerHTML = `
+                <button class="btn btn-primary btn-sm" id="btn-open-auth">
+                    <i class="fa-solid fa-user-lock"></i> Sign In / Register
+                </button>
+            `;
+            document.getElementById("btn-open-auth")?.addEventListener("click", openAuthModal);
+        }
+    }
+
+    function openAuthModal() {
+        showAuthAlert("", "");
+        authModal.classList.add("active");
+    }
+
+    function closeAuthModal() {
+        authModal.classList.remove("active");
+    }
+
+    // Auth Tabs Switcher
+    tabLogin?.addEventListener("click", () => {
+        isSignUpMode = false;
+        tabLogin.classList.add("active");
+        tabSignup.classList.remove("active");
+        authModalTitle.innerHTML = `<i class="fa-solid fa-lock"></i> Welcome Back`;
+        authModalSubtitle.innerText = "Sign in to access medical AI search & PDF indexing";
+        btnAuthSubmit.innerText = "Sign In";
+        showAuthAlert("", "");
+    });
+
+    tabSignup?.addEventListener("click", () => {
+        isSignUpMode = true;
+        tabSignup.classList.add("active");
+        tabLogin.classList.remove("active");
+        authModalTitle.innerHTML = `<i class="fa-solid fa-user-plus"></i> Create Account`;
+        authModalSubtitle.innerText = "Register your email to unlock SAGE AI capabilities";
+        btnAuthSubmit.innerText = "Create Account";
+        showAuthAlert("", "");
+    });
+
+    btnAuthCancel?.addEventListener("click", closeAuthModal);
+    btnOpenAuth?.addEventListener("click", openAuthModal);
+
+    // Auth Form Submit (Sign In / Sign Up)
+    authForm?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = authEmailInput.value.trim();
+        const password = authPasswordInput.value.trim();
+
+        if (!email || !password) {
+            showAuthAlert("Please fill in email and password.", "error");
+            return;
+        }
+
+        btnAuthSubmit.disabled = true;
+        btnAuthSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing...`;
+
+        try {
+            if (isSignUpMode) {
+                const { data, error } = await supabaseClient.auth.signUp({ email, password });
+                if (error) throw error;
+
+                if (data?.session) {
+                    showAuthAlert("Account created successfully! You are logged in.", "success");
+                    setTimeout(closeAuthModal, 1500);
+                } else {
+                    showAuthAlert("Account created! Check your email to confirm registration.", "success");
+                }
+            } else {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+
+                showAuthAlert("Signed in successfully!", "success");
+                setTimeout(closeAuthModal, 1000);
+            }
+        } catch (err) {
+            showAuthAlert(err.message || "Authentication failed", "error");
+        } finally {
+            btnAuthSubmit.disabled = false;
+            btnAuthSubmit.innerText = isSignUpMode ? "Create Account" : "Sign In";
+        }
+    });
+
+    function showAuthAlert(msg, type) {
+        if (!msg) {
+            authAlert.style.display = "none";
+            return;
+        }
+        authAlert.className = `auth-alert ${type}`;
+        authAlert.innerText = msg;
+        authAlert.style.display = "block";
+    }
 
     // Check API Health
     async function checkApiHealth() {
         try {
             const res = await fetch(`${apiBaseUrl}/health`);
             if (res.ok) {
-                const data = await res.json();
                 systemStatus.innerHTML = `
                     <span class="status-dot success"></span>
                     <span class="status-text">Connected: Supabase Vector</span>
@@ -47,7 +202,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Fetch Indexed Documents
     async function fetchDocuments() {
         try {
-            const res = await fetch(`${apiBaseUrl}/documents`);
+            const headers = {};
+            if (currentUserSession?.access_token) {
+                headers["Authorization"] = `Bearer ${currentUserSession.access_token}`;
+            }
+            const res = await fetch(`${apiBaseUrl}/documents`, { headers });
             if (res.ok) {
                 const data = await res.json();
                 renderDocumentList(data.documents || []);
@@ -84,9 +243,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const formData = new FormData();
         formData.append("file", file);
 
+        const headers = {};
+        if (currentUserSession?.access_token) {
+            headers["Authorization"] = `Bearer ${currentUserSession.access_token}`;
+        }
+
         try {
             const res = await fetch(`${apiBaseUrl}/upload`, {
                 method: "POST",
+                headers,
                 body: formData
             });
 
@@ -126,10 +291,15 @@ document.addEventListener("DOMContentLoaded", () => {
         // Add Bot Loading State
         const loadingId = appendMessage("bot", `<i class="fa-solid fa-spinner fa-spin"></i> Searching Supabase Vector DB...`);
 
+        const headers = { "Content-Type": "application/json" };
+        if (currentUserSession?.access_token) {
+            headers["Authorization"] = `Bearer ${currentUserSession.access_token}`;
+        }
+
         try {
             const res = await fetch(`${apiBaseUrl}/query`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers,
                 body: JSON.stringify({ question })
             });
 
