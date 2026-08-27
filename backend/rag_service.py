@@ -179,7 +179,7 @@ ANSWER:"""
             
             # Method 1: Direct HTTP REST API (fastest, most reliable, no SDK version issues)
             import requests
-            for model_name in ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']:
+            for model_name in ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-pro']:
                 try:
                     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.gemini_api_key.strip()}"
                     headers = {"Content-Type": "application/json"}
@@ -204,7 +204,7 @@ ANSWER:"""
 
             # Method 2: SDK Fallback if REST didn't return text
             if not answer:
-                for model_name in ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']:
+                for model_name in ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-pro']:
                     try:
                         llm = genai.GenerativeModel(model_name)
                         response = llm.generate_content(prompt)
