@@ -159,10 +159,10 @@ class SupabaseRAGService:
         context_str = "\n\n".join(context_blocks)
 
         # 4. Generate answer via Cloud LLM API or Extractive Fallback
+        active_key = (os.getenv("GEMINI_API_KEY") or self.gemini_api_key or "").strip()
         is_valid_key = (
-            self.gemini_api_key
-            and self.gemini_api_key.strip() != ""
-            and "your-google-gemini-api-key" not in self.gemini_api_key
+            active_key != ""
+            and "your-google-gemini-api-key" not in active_key
         )
 
         if is_valid_key:
@@ -181,7 +181,7 @@ ANSWER:"""
             import requests
             for model_name in ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-pro']:
                 try:
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.gemini_api_key.strip()}"
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={active_key}"
                     headers = {"Content-Type": "application/json"}
                     payload = {"contents": [{"parts": [{"text": prompt}]}]}
                     
