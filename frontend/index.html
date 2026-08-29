@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SAGE - AI Medical Research Assistant</title>
-    <meta name="description" content="Interactive AI Medical Research Assistant powered by Netlify, Supabase pgvector, and clinical document RAG.">
+    <title>SAGE - AI Document Research Assistant</title>
+    <meta name="description" content="Universal AI Document Research Assistant powered by Netlify, Supabase pgvector, and multi-format document RAG.">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,7 +23,7 @@
                 </div>
                 <div class="brand-title">
                     <h2>SAGE</h2>
-                    <span>Medical AI RAG</span>
+                    <span>Universal Document AI</span>
                 </div>
             </div>
 
@@ -34,11 +34,11 @@
 
             <!-- PDF Upload Section -->
             <div class="sidebar-section">
-                <h3><i class="fa-solid fa-file-pdf"></i> Research Documents</h3>
-                <p class="section-desc">Upload clinical papers to index into Supabase Vector DB.</p>
+                <h3><i class="fa-solid fa-file-pdf"></i> Upload Documents</h3>
+                <p class="section-desc">Upload PDF files to index into Supabase Vector DB.</p>
                 
                 <label for="pdf-file-input" class="upload-btn">
-                    <i class="fa-solid fa-cloud-arrow-up"></i> Upload Medical PDF
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Upload Document (PDF)
                     <input type="file" id="pdf-file-input" accept=".pdf" style="display: none;">
                 </label>
                 <div id="upload-status" class="upload-status"></div>
@@ -66,8 +66,8 @@
             <!-- Header Bar -->
             <header class="top-header">
                 <div class="header-info">
-                    <h1>🐼 Medical Research Assistant</h1>
-                    <p>Evidence-based clinical query system powered by Supabase <code>pgvector</code></p>
+                    <h1>📄 Document Research Assistant</h1>
+                    <p>Evidence-grounded query system powered by Supabase <code>pgvector</code></p>
                 </div>
                 <div class="header-actions">
                     <div id="auth-header-container">
@@ -86,26 +86,26 @@
                 <!-- Welcome Screen Card -->
                 <div class="welcome-card" id="welcome-screen">
                     <div class="welcome-icon">
-                        <i class="fa-solid fa-stethoscope"></i>
+                        <i class="fa-solid fa-file-lines"></i>
                     </div>
-                    <h2>Welcome to SAGE Medical AI</h2>
-                    <p>Ask questions about clinical guidelines, diagnosis protocol, and medical research papers.</p>
+                    <h2>Welcome to SAGE Document AI</h2>
+                    <p>Ask questions, extract insights, and analyze content from any uploaded document.</p>
                     
                     <div class="feature-grid">
                         <div class="feature-item" id="sample-q1">
-                            <i class="fa-solid fa-syringe"></i>
-                            <h4>Diabetes Guidelines</h4>
-                            <p>"What is the recommended first-line treatment for Type 2 Diabetes?"</p>
+                            <i class="fa-solid fa-magnifying-glass-chart"></i>
+                            <h4>Deep Document Q&A</h4>
+                            <p>"Summarize the primary objectives and key findings."</p>
                         </div>
                         <div class="feature-item" id="sample-q2">
-                            <i class="fa-solid fa-heart-pulse"></i>
-                            <h4>Diagnostic Criteria</h4>
-                            <p>"What are the HbA1c diagnostic thresholds for diabetes?"</p>
+                            <i class="fa-solid fa-list-check"></i>
+                            <h4>Data & Fact Extraction</h4>
+                            <p>"What are the specific metrics, dates, and numbers mentioned?"</p>
                         </div>
                         <div class="feature-item" id="sample-q3">
-                            <i class="fa-solid fa-book-medical"></i>
-                            <h4>Clinical Evidence</h4>
-                            <p>"Summarize key risk factors mentioned in uploaded papers."</p>
+                            <i class="fa-solid fa-scale-balanced"></i>
+                            <h4>Cross-Document Analysis</h4>
+                            <p>"Compare key points and conclusions across the files."</p>
                         </div>
                     </div>
                 </div>
@@ -114,7 +114,7 @@
             <!-- Chat Input Form -->
             <div class="input-container">
                 <form id="chat-form">
-                    <input type="text" id="user-input" placeholder="Ask a medical research question..." autocomplete="off">
+                    <input type="text" id="user-input" placeholder="Ask a question about your documents..." autocomplete="off">
                     <button type="submit" id="send-btn">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
@@ -133,14 +133,14 @@
             
             <div class="auth-form-container">
                 <h3 id="auth-modal-title"><i class="fa-solid fa-lock"></i> Welcome Back</h3>
-                <p id="auth-modal-subtitle">Sign in to access medical AI search & PDF indexing</p>
+                <p id="auth-modal-subtitle">Sign in to access AI document search & PDF indexing</p>
 
                 <div id="auth-alert" class="auth-alert" style="display: none;"></div>
 
                 <form id="auth-form">
                     <div class="form-group">
                         <label for="auth-email"><i class="fa-solid fa-envelope"></i> Email Address</label>
-                        <input type="email" id="auth-email" placeholder="doctor@hospital.org" required autocomplete="email">
+                        <input type="email" id="auth-email" placeholder="user@example.com" required autocomplete="email">
                     </div>
                     <div class="form-group">
                         <label for="auth-password"><i class="fa-solid fa-key"></i> Password</label>

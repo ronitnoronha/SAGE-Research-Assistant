@@ -105,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
         tabLogin.classList.add("active");
         tabSignup.classList.remove("active");
         authModalTitle.innerHTML = `<i class="fa-solid fa-lock"></i> Welcome Back`;
-        authModalSubtitle.innerText = "Sign in to access medical AI search & PDF indexing";
+        authModalSubtitle.innerText = "Sign in to access AI document search & PDF indexing";
         btnAuthSubmit.innerText = "Sign In";
         showAuthAlert("", "");
     });
@@ -364,9 +364,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Quick Sample Questions
-    document.getElementById("sample-q1")?.addEventListener("click", () => sendQuestion("What is the recommended first-line treatment for Type 2 Diabetes?"));
-    document.getElementById("sample-q2")?.addEventListener("click", () => sendQuestion("What are the HbA1c diagnostic thresholds for diabetes?"));
-    document.getElementById("sample-q3")?.addEventListener("click", () => sendQuestion("Summarize key risk factors mentioned in uploaded papers."));
+    document.getElementById("sample-q1")?.addEventListener("click", () => sendQuestion("Summarize the primary objectives and key findings in the documents."));
+    document.getElementById("sample-q2")?.addEventListener("click", () => sendQuestion("What are the specific metrics, dates, and numbers mentioned?"));
+    document.getElementById("sample-q3")?.addEventListener("click", () => sendQuestion("Compare the main conclusions and insights across the uploaded files."));
 
     // Clear Chat
     btnClearChat.addEventListener("click", () => {

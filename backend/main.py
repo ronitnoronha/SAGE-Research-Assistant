@@ -11,8 +11,8 @@ load_dotenv()
 from rag_service import SupabaseRAGService
 
 app = FastAPI(
-    title="SAGE Research Assistant API",
-    description="Supabase & Netlify Cloud Backend for Medical RAG",
+    title="SAGE Document Research Assistant API",
+    description="Supabase & Netlify Cloud Backend for Universal Document RAG",
     version="2.0.0"
 )
 
@@ -54,7 +54,7 @@ def get_current_user(authorization: Optional[str] = Header(None)):
 @app.get("/")
 def root():
     return {
-        "system": "SAGE Medical Research Assistant API",
+        "system": "SAGE Document Research Assistant API",
         "status": "online",
         "vector_db": "Supabase pgvector"
     }
@@ -77,8 +77,8 @@ async def upload_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/query")
-def query_medical_rag(request: QueryRequest):
-    """Perform RAG vector query against Supabase"""
+def query_rag(request: QueryRequest):
+    """Perform RAG vector query against indexed documents in Supabase"""
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     

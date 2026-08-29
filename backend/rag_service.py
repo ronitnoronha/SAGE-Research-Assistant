@@ -142,7 +142,7 @@ class SupabaseRAGService:
         return all_matches[:6]
 
     def query_rag(self, question: str, match_count: int = 5) -> Dict[str, Any]:
-        """Perform Vector similarity search on Supabase & generate structured medical answer"""
+        """Perform Vector similarity search on Supabase & generate structured answer from documents"""
         if not self.client:
             raise RuntimeError("Supabase client not configured.")
 
@@ -151,7 +151,7 @@ class SupabaseRAGService:
 
         if not matches_to_use:
             return {
-                "answer": "No relevant evidence found in the research papers stored on Supabase.",
+                "answer": "No relevant information found in the documents stored on Supabase.",
                 "sources": [],
                 "mode": "extractive_fallback"
             }
@@ -174,20 +174,20 @@ class SupabaseRAGService:
 
         context_str = "\n\n".join(context_blocks)
 
-        # 3. Restored exact original Prompt Template from rag_system.py
-        prompt = f"""You are a medical research expert. Analyze the following research papers and provide a comprehensive answer.
+        # 3. Universal Document Analysis Prompt Template
+        prompt = f"""You are SAGE, an intelligent document analysis and research assistant. Analyze the provided context from the uploaded documents and provide an accurate, clear, and comprehensive answer to the user's question.
 
-RESEARCH CONTEXT:
+DOCUMENT CONTEXT:
 {context_str}
 
 QUESTION: {question}
 
 INSTRUCTIONS:
-1. Extract ALL relevant information from the research context
-2. Include specific numbers, criteria, and recommendations
-3. If information is missing, say what you found and what's missing
-4. Be precise and cite details from the papers
-5. Provide ONLY the final medical answer. DO NOT include any self-checks, verification steps, instruction checklists, or meta-notes in your response.
+1. Base your answer directly and thoroughly on the provided document context.
+2. Extract all relevant facts, figures, key metrics, findings, and details.
+3. If the context does not contain enough information to fully answer the question, clearly state what information is available and what is missing.
+4. Structure the response clearly with logical sections or bullet points when appropriate.
+5. Provide ONLY the final answer. DO NOT include any self-checks, verification steps, instruction checklists, thinking process, or meta-notes in your response.
 
 ANSWER:"""
         answer = None
@@ -304,18 +304,18 @@ ANSWER:"""
     def _extractive_synthesis(self, question: str, matches: List[Dict[str, Any]]) -> str:
         """Fallback synthesis directly from retrieved Supabase vector passages"""
         lines = [
-            f"**Medical Document Synthesis for:** *{question}*\n",
-            "Extracted clinical passages retrieved from Supabase Vector index:\n"
+            f"**Document Synthesis for:** *{question}*\n",
+            "Extracted passages retrieved from Supabase Vector index:\n"
         ]
         for idx, item in enumerate(matches[:4], 1):
             meta = item.get("metadata", {})
-            source_file = meta.get("source", "Medical Document")
+            source_file = meta.get("source", "Document")
             page = meta.get("page", 1)
             content = item.get("content", "").strip().replace("\n", " ")
             lines.append(f"📌 **Excerpt {idx}** (*{source_file}*, Page {page}):")
             lines.append(f"> \"{content}\"\n")
 
-        lines.append("ℹ️ *Extractive Mode active via Supabase `pgvector`. Add `GEMINI_API_KEY` for generative answers.*")
+        lines.append("ℹ️ *Extractive Mode active via Supabase `pgvector`.*")
         return "\n".join(lines)
 
     def list_documents(self) -> List[Dict[str, Any]]:
