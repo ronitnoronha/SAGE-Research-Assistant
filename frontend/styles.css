@@ -616,3 +616,25 @@ body {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* LangChain Tool Execution Badges */
+.tools-execution-box {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.tool-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    background: rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    border-radius: 12px;
+    color: #d8b4fe;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+}

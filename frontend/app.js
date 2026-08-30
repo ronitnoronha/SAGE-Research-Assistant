@@ -227,6 +227,9 @@ document.addEventListener("DOMContentLoaded", () => {
         `).join("");
     }
 
+    // Conversational Multi-Turn Memory State
+    let conversationHistory = [];
+
     // PDF Upload Handler
     pdfFileInput.addEventListener("change", async (e) => {
         const file = e.target.files[0];
@@ -279,11 +282,12 @@ document.addEventListener("DOMContentLoaded", () => {
             welcomeScreen.style.display = "none";
         }
 
-        // Add User Message
+        // Add User Message to UI and History
         appendMessage("user", question);
+        conversationHistory.push({ role: "user", content: question });
 
         // Add Bot Loading State
-        const loadingId = appendMessage("bot", `<i class="fa-solid fa-spinner fa-spin"></i> Searching Supabase Vector DB...`);
+        const loadingId = appendMessage("bot", `<i class="fa-solid fa-brain fa-fade"></i> Analyzing documents with LangChain Agent...`);
 
         const headers = { "Content-Type": "application/json" };
         if (currentUserSession?.access_token) {
@@ -294,12 +298,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch(`${apiBaseUrl}/query`, {
                 method: "POST",
                 headers,
-                body: JSON.stringify({ question })
+                body: JSON.stringify({ 
+                    question,
+                    chat_history: conversationHistory.slice(-6)
+                })
             });
 
             if (res.ok) {
                 const data = await res.json();
-                updateMessage(loadingId, data.answer, data.sources);
+                conversationHistory.push({ role: "assistant", content: data.answer });
+                updateMessage(loadingId, data.answer, data.sources, data.tools_used);
             } else {
                 updateMessage(loadingId, "⚠️ Error processing request from server.");
             }
@@ -328,7 +336,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return msgId;
     }
 
-    function updateMessage(msgId, answerText, sources) {
+    function updateMessage(msgId, answerText, sources, toolsUsed) {
         const row = document.getElementById(msgId);
         if (!row) return;
 
@@ -341,6 +349,12 @@ document.addEventListener("DOMContentLoaded", () => {
             formattedText = answerText
                 .replace(/\n\n/g, "<br><br>")
                 .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+        }
+
+        let toolsHtml = "";
+        if (toolsUsed && toolsUsed.length > 0) {
+            const toolBadges = toolsUsed.map(t => `<span class="tool-badge"><i class="fa-solid fa-microchip"></i> ${t}</span>`).join(" ");
+            toolsHtml = `<div class="tools-execution-box">${toolBadges}</div>`;
         }
 
         let sourcesHtml = "";
@@ -359,7 +373,7 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
         }
 
-        bubble.innerHTML = formattedText + sourcesHtml;
+        bubble.innerHTML = toolsHtml + formattedText + sourcesHtml;
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
@@ -371,6 +385,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Clear Chat
     btnClearChat.addEventListener("click", () => {
         chatMessages.innerHTML = "";
+        conversationHistory = [];
         if (welcomeScreen) {
             welcomeScreen.style.display = "block";
             chatMessages.appendChild(welcomeScreen);

@@ -30,11 +30,14 @@ rag_service = SupabaseRAGService()
 
 class QueryRequest(BaseModel):
     question: str
+    chat_history: Optional[List[Dict[str, str]]] = None
 
 class QueryResponse(BaseModel):
     answer: str
+    key_findings: Optional[List[str]] = None
     sources: Optional[List[dict]] = None
-    mode: Optional[str] = "supabase_pgvector"
+    tools_used: Optional[List[str]] = None
+    mode: Optional[str] = "agentic_rag"
 
 from fastapi import Header
 
@@ -78,12 +81,12 @@ async def upload_pdf(file: UploadFile = File(...)):
 
 @app.post("/query")
 def query_rag(request: QueryRequest):
-    """Perform RAG vector query against indexed documents in Supabase"""
+    """Perform Agentic RAG vector query with multi-turn memory against indexed documents in Supabase"""
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     
     try:
-        result = rag_service.query_rag(request.question)
+        result = rag_service.query_rag(request.question, chat_history=request.chat_history)
         return result
     except Exception as e:
         import traceback
@@ -91,7 +94,9 @@ def query_rag(request: QueryRequest):
         print(f"❌ Exception in /query: {err_detail}", flush=True)
         return {
             "answer": err_detail,
+            "key_findings": [],
             "sources": [],
+            "tools_used": [],
             "mode": "error"
         }
 
