@@ -10,8 +10,11 @@ from supabase import create_client, Client
 import google.generativeai as genai
 
 # LangChain Core Schemas & Tools
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
-from langchain_core.tools import tool
+try:
+    from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
+    from langchain_core.tools import tool
+except Exception:
+    pass
 from pydantic import BaseModel, Field
 
 
@@ -471,7 +474,9 @@ ANSWER:"""
             mode=mode
         )
 
-        return response_obj.model_dump()
+        if hasattr(response_obj, "model_dump"):
+            return response_obj.model_dump()
+        return response_obj.dict()
 
     def _extractive_synthesis(self, question: str, matches: List[Dict[str, Any]]) -> str:
         """Fallback synthesis directly from retrieved Supabase vector passages"""
