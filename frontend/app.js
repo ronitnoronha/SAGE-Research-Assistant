@@ -1,7 +1,10 @@
 // app.js - FRONTEND CONTROLLER FOR SAGE RESEARCH ASSISTANT WITH SUPABASE AUTH
 document.addEventListener("DOMContentLoaded", () => {
-    // Permanent Production Backend Endpoint
-    const apiBaseUrl = "https://sage-research-assistant.onrender.com";
+    // Configurable Backend API Endpoint
+    let apiBaseUrl = localStorage.getItem("sage_api_url") || 
+        (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+            ? "http://localhost:8000"
+            : "https://sage-research-assistant.onrender.com");
 
     // Supabase Auth Client
     const SUPABASE_URL = "https://vvpstsihxzoselrunhwy.supabase.co";
@@ -40,6 +43,42 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnAuthSubmit = document.getElementById("btn-auth-submit");
     const btnAuthCancel = document.getElementById("btn-auth-cancel");
     const authAlert = document.getElementById("auth-alert");
+
+    // Settings Modal Elements
+    const btnSettings = document.getElementById("btn-settings");
+    const settingsModal = document.getElementById("settings-modal");
+    const settingsForm = document.getElementById("settings-form");
+    const backendUrlInput = document.getElementById("backend-url-input");
+    const btnSettingsCancel = document.getElementById("btn-settings-cancel");
+
+    if (backendUrlInput) {
+        backendUrlInput.value = apiBaseUrl;
+    }
+
+    btnSettings?.addEventListener("click", () => {
+        if (backendUrlInput) backendUrlInput.value = apiBaseUrl;
+        settingsModal?.classList.add("active");
+    });
+
+    btnSettingsCancel?.addEventListener("click", () => {
+        settingsModal?.classList.remove("active");
+    });
+
+    settingsForm?.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const newUrl = backendUrlInput.value.trim().replace(/\/+$/, "");
+        if (newUrl) {
+            apiBaseUrl = newUrl;
+            localStorage.setItem("sage_api_url", apiBaseUrl);
+            settingsModal?.classList.remove("active");
+            systemStatus.innerHTML = `
+                <span class="status-dot warning"></span>
+                <span class="status-text">Connecting to ${apiBaseUrl}...</span>
+            `;
+            checkApiHealth();
+            fetchDocuments();
+        }
+    });
 
     let isSignUpMode = false;
 
@@ -176,7 +215,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Check API Health
     async function checkApiHealth() {
         try {
-            const res = await fetch(`${apiBaseUrl}/health`);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            const res = await fetch(`${apiBaseUrl}/health`, { signal: controller.signal });
+            clearTimeout(timeoutId);
+
             if (res.ok) {
                 systemStatus.innerHTML = `
                     <span class="status-dot success"></span>
@@ -188,7 +231,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
             systemStatus.innerHTML = `
                 <span class="status-dot warning"></span>
-                <span class="status-text">API Disconnected</span>
+                <span class="status-text">API Offline (Click ⚙️ to set)</span>
             `;
         }
     }
@@ -200,7 +243,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (currentUserSession?.access_token) {
                 headers["Authorization"] = `Bearer ${currentUserSession.access_token}`;
             }
-            const res = await fetch(`${apiBaseUrl}/documents`, { headers });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            const res = await fetch(`${apiBaseUrl}/documents`, { headers, signal: controller.signal });
+            clearTimeout(timeoutId);
+
             if (res.ok) {
                 const data = await res.json();
                 renderDocumentList(data.documents || []);
@@ -246,11 +293,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000);
             const res = await fetch(`${apiBaseUrl}/upload`, {
                 method: "POST",
                 headers,
-                body: formData
+                body: formData,
+                signal: controller.signal
             });
+            clearTimeout(timeoutId);
 
             if (res.ok) {
                 const result = await res.json();
@@ -261,10 +312,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 uploadStatus.innerHTML = `<span style="color:#ef4444;">❌ ${errData.detail || "Upload failed"}</span>`;
             }
         } catch (err) {
-            uploadStatus.innerHTML = `<span style="color:#ef4444;">❌ Network error</span>`;
+            uploadStatus.innerHTML = `<span style="color:#ef4444;">❌ Backend unreachable (Click ⚙️ to change endpoint)</span>`;
         }
 
-        setTimeout(() => { uploadStatus.innerHTML = ""; }, 5000);
+        setTimeout(() => { uploadStatus.innerHTML = ""; }, 8000);
     });
 
     // Chat Form Submit

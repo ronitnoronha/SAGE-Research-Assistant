@@ -75,6 +75,9 @@
                             <i class="fa-solid fa-user-lock"></i> Sign In / Register
                         </button>
                     </div>
+                    <button class="icon-btn" id="btn-settings" title="Backend API Settings">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
                     <button class="icon-btn" id="btn-clear-chat" title="Clear Conversation">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
@@ -152,6 +155,26 @@
                     </div>
                 </form>
             </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal-card auth-card">
+            <h3 style="margin-bottom: 8px;"><i class="fa-solid fa-gear"></i> Backend API Settings</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">
+                Configure your FastAPI backend URL. Use <code>http://localhost:8000</code> when running locally.
+            </p>
+            <form id="settings-form">
+                <div class="form-group">
+                    <label for="backend-url-input"><i class="fa-solid fa-server"></i> API Endpoint URL</label>
+                    <input type="text" id="backend-url-input" placeholder="http://localhost:8000" required>
+                </div>
+                <div class="modal-actions" style="margin-top: 16px;">
+                    <button type="button" class="btn btn-secondary" id="btn-settings-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-settings-save">Save & Connect</button>
+                </div>
+            </form>
         </div>
     </div>
 
