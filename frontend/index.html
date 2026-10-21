@@ -4,27 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SAGE - AI Document Research Assistant</title>
-    <meta name="description" content="Universal AI Document Research Assistant powered by Netlify, Supabase pgvector, and multi-format document RAG.">
-    <!-- Google Fonts -->
+    <meta name="description" content="Ask questions about your PDFs and get answers grounded in the source, with page-level citations.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar Navigation & Library -->
-        <aside class="sidebar">
+        <!-- Sidebar: brand, upload, library -->
+        <aside class="sidebar" id="sidebar">
             <div class="brand-header">
-                <div class="brand-logo">
-                    <i class="fa-solid fa-brain"></i>
-                </div>
+                <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
                 <div class="brand-title">
                     <h2>SAGE</h2>
-                    <span>Universal Document AI</span>
+                    <span>Document research assistant</span>
                 </div>
+                <button class="icon-btn sidebar-close" id="btn-sidebar-close" title="Close library" aria-label="Close library">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
 
             <div class="status-badge" id="system-status">
@@ -32,154 +31,144 @@
                 <span class="status-text">Checking API...</span>
             </div>
 
-            <!-- PDF Upload Section -->
-            <div class="sidebar-section">
-                <h3><i class="fa-solid fa-file-pdf"></i> Upload Documents</h3>
-                <p class="section-desc">Upload PDF files to index into Supabase Vector DB.</p>
-                
-                <label for="pdf-file-input" class="upload-btn">
-                    <i class="fa-solid fa-cloud-arrow-up"></i> Upload Document (PDF)
-                    <input type="file" id="pdf-file-input" accept=".pdf" style="display: none;">
-                </label>
-                <div id="upload-status" class="upload-status"></div>
-            </div>
+            <label for="pdf-file-input" class="dropzone" id="dropzone">
+                <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                <span class="dz-title">Upload a PDF</span>
+                <span class="dz-sub">Click or drop a file here</span>
+                <input type="file" id="pdf-file-input" accept=".pdf" hidden>
+            </label>
+            <div id="upload-status" class="upload-status" role="status"></div>
 
-            <!-- Document List -->
-            <div class="sidebar-section list-section">
-                <h3><i class="fa-solid fa-layer-group"></i> Indexed Library</h3>
+            <div class="library">
+                <div class="library-head">
+                    <h3>Library</h3>
+                    <span class="mono" id="doc-count"></span>
+                </div>
                 <div id="document-list" class="document-list">
                     <div class="empty-docs">No documents indexed yet.</div>
                 </div>
             </div>
 
-            <!-- Deployment Badges -->
-            <div class="sidebar-footer">
-                <div class="tech-stack">
-                    <span class="badge netlify"><i class="fa-solid fa-bolt"></i> Netlify</span>
-                    <span class="badge supabase"><i class="fa-solid fa-database"></i> Supabase</span>
-                </div>
+            <div class="sidebar-footer mono">
+                <span>Netlify · Render · Supabase pgvector</span>
             </div>
         </aside>
+        <div class="sidebar-scrim" id="sidebar-scrim"></div>
 
-        <!-- Main Chat & Content Area -->
+        <!-- Main chat area -->
         <main class="main-content">
-            <!-- Header Bar -->
+            <canvas id="vector-space" aria-hidden="true"></canvas>
+
             <header class="top-header">
+                <button class="icon-btn menu-btn" id="btn-sidebar-open" title="Open library" aria-label="Open library">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
                 <div class="header-info">
-                    <h1>📄 Document Research Assistant</h1>
-                    <p>Evidence-grounded query system powered by Supabase <code>pgvector</code></p>
+                    <h1>Research chat</h1>
                 </div>
                 <div class="header-actions">
                     <div id="auth-header-container">
-                        <button class="btn btn-primary btn-sm" id="btn-open-auth">
-                            <i class="fa-solid fa-user-lock"></i> Sign In / Register
-                        </button>
+                        <button class="btn btn-primary btn-sm" id="btn-open-auth">Sign in</button>
                     </div>
-                    <button class="icon-btn" id="btn-settings" title="Backend API Settings">
-                        <i class="fa-solid fa-gear"></i>
+                    <button class="icon-btn" id="btn-settings" title="Backend settings" aria-label="Backend settings">
+                        <i class="fa-solid fa-sliders"></i>
                     </button>
-                    <button class="icon-btn" id="btn-clear-chat" title="Clear Conversation">
-                        <i class="fa-solid fa-trash-can"></i>
+                    <button class="icon-btn" id="btn-clear-chat" title="New chat" aria-label="New chat">
+                        <i class="fa-solid fa-pen-to-square"></i>
                     </button>
                 </div>
             </header>
 
-            <!-- Chat Window -->
             <div class="chat-container" id="chat-messages">
-                <!-- Welcome Screen Card -->
                 <div class="welcome-card" id="welcome-screen">
-                    <div class="welcome-icon">
-                        <i class="fa-solid fa-file-lines"></i>
-                    </div>
-                    <h2>Welcome to SAGE Document AI</h2>
-                    <p>Ask questions, extract insights, and analyze content from any uploaded document.</p>
-                    
+                    <span class="eyebrow mono">Retrieval-augmented answers</span>
+                    <h2>Ask your documents anything.</h2>
+                    <p>Upload a PDF, then ask a question. Every answer is grounded in your files and cites the pages it came from.</p>
+
                     <div class="feature-grid">
-                        <div class="feature-item" id="sample-q1">
-                            <i class="fa-solid fa-magnifying-glass-chart"></i>
-                            <h4>Deep Document Q&A</h4>
-                            <p>"Summarize the primary objectives and key findings."</p>
-                        </div>
-                        <div class="feature-item" id="sample-q2">
-                            <i class="fa-solid fa-list-check"></i>
-                            <h4>Data & Fact Extraction</h4>
-                            <p>"What are the specific metrics, dates, and numbers mentioned?"</p>
-                        </div>
-                        <div class="feature-item" id="sample-q3">
-                            <i class="fa-solid fa-scale-balanced"></i>
-                            <h4>Cross-Document Analysis</h4>
-                            <p>"Compare key points and conclusions across the files."</p>
-                        </div>
+                        <button class="feature-item" id="sample-q1" type="button">
+                            <span class="mono">Summarize</span>
+                            <p>Summarize the primary objectives and key findings.</p>
+                        </button>
+                        <button class="feature-item" id="sample-q2" type="button">
+                            <span class="mono">Extract</span>
+                            <p>What are the specific metrics, dates, and numbers mentioned?</p>
+                        </button>
+                        <button class="feature-item" id="sample-q3" type="button">
+                            <span class="mono">Compare</span>
+                            <p>Compare key points and conclusions across the files.</p>
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Chat Input Form -->
             <div class="input-container">
                 <form id="chat-form">
+                    <label for="pdf-file-input" class="attach-btn" title="Upload a PDF" aria-label="Upload a PDF">
+                        <i class="fa-solid fa-paperclip"></i>
+                    </label>
                     <input type="text" id="user-input" placeholder="Ask a question about your documents..." autocomplete="off">
-                    <button type="submit" id="send-btn">
-                        <i class="fa-solid fa-paper-plane"></i>
+                    <button type="submit" id="send-btn" aria-label="Send">
+                        <i class="fa-solid fa-arrow-up"></i>
                     </button>
                 </form>
+                <p class="input-hint">Answers come only from the documents in your library.</p>
             </div>
         </main>
     </div>
 
-    <!-- User Auth Modal -->
+    <!-- Sign in / register -->
     <div class="modal-overlay" id="auth-modal">
-        <div class="modal-card auth-card">
+        <div class="modal-card">
             <div class="auth-tabs">
-                <button class="auth-tab active" id="tab-login">Sign In</button>
-                <button class="auth-tab" id="tab-signup">Create Account</button>
+                <button class="auth-tab active" id="tab-login" type="button">Sign in</button>
+                <button class="auth-tab" id="tab-signup" type="button">Create account</button>
             </div>
-            
-            <div class="auth-form-container">
-                <h3 id="auth-modal-title"><i class="fa-solid fa-lock"></i> Welcome Back</h3>
-                <p id="auth-modal-subtitle">Sign in to access AI document search & PDF indexing</p>
 
-                <div id="auth-alert" class="auth-alert" style="display: none;"></div>
+            <h3 id="auth-modal-title">Welcome back</h3>
+            <p id="auth-modal-subtitle">Sign in to upload and search your documents.</p>
 
-                <form id="auth-form">
-                    <div class="form-group">
-                        <label for="auth-email"><i class="fa-solid fa-envelope"></i> Email Address</label>
-                        <input type="email" id="auth-email" placeholder="user@example.com" required autocomplete="email">
-                    </div>
-                    <div class="form-group">
-                        <label for="auth-password"><i class="fa-solid fa-key"></i> Password</label>
-                        <input type="password" id="auth-password" placeholder="••••••••••••" required autocomplete="current-password">
-                    </div>
-                    <div class="modal-actions">
-                        <button type="button" class="btn btn-secondary" id="btn-auth-cancel">Cancel</button>
-                        <button type="submit" class="btn btn-primary" id="btn-auth-submit">Sign In</button>
-                    </div>
-                </form>
-            </div>
+            <div id="auth-alert" class="auth-alert" style="display: none;"></div>
+
+            <form id="auth-form">
+                <div class="form-group">
+                    <label for="auth-email">Email</label>
+                    <input type="email" id="auth-email" placeholder="you@example.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="auth-password">Password</label>
+                    <input type="password" id="auth-password" placeholder="••••••••" required autocomplete="current-password">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-auth-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-auth-submit">Sign in</button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <!-- Settings Modal -->
+    <!-- Backend settings -->
     <div class="modal-overlay" id="settings-modal">
-        <div class="modal-card auth-card">
-            <h3 style="margin-bottom: 8px;"><i class="fa-solid fa-gear"></i> Backend API Settings</h3>
-            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">
-                Configure your FastAPI backend URL. Use <code>http://localhost:8000</code> when running locally.
-            </p>
+        <div class="modal-card">
+            <h3>Backend settings</h3>
+            <p>The FastAPI server SAGE talks to. Use <code>http://localhost:8000</code> when running locally.</p>
             <form id="settings-form">
                 <div class="form-group">
-                    <label for="backend-url-input"><i class="fa-solid fa-server"></i> API Endpoint URL</label>
+                    <label for="backend-url-input">API endpoint URL</label>
                     <input type="text" id="backend-url-input" placeholder="http://localhost:8000" required>
                 </div>
-                <div class="modal-actions" style="margin-top: 16px;">
+                <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" id="btn-settings-cancel">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="btn-settings-save">Save & Connect</button>
+                    <button type="submit" class="btn btn-primary" id="btn-settings-save">Save and connect</button>
                 </div>
             </form>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="vector-space.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

@@ -82,6 +82,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let isSignUpMode = false;
 
+    const escapeHtml = (str) => String(str ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const mainContent = document.querySelector(".main-content");
+    const setThinking = (on) => window.SageSpace?.setThinking(on);
+
+    // Mobile library drawer
+    const sidebar = document.getElementById("sidebar");
+    const closeSidebar = () => sidebar?.classList.remove("open");
+    document.getElementById("btn-sidebar-open")?.addEventListener("click", () => sidebar?.classList.add("open"));
+    document.getElementById("btn-sidebar-close")?.addEventListener("click", closeSidebar);
+    document.getElementById("sidebar-scrim")?.addEventListener("click", closeSidebar);
+
+    // Drag & drop upload onto the dropzone
+    const dropzone = document.getElementById("dropzone");
+    ["dragenter", "dragover"].forEach(ev => dropzone?.addEventListener(ev, (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragging");
+    }));
+    ["dragleave", "drop"].forEach(ev => dropzone?.addEventListener(ev, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragging");
+    }));
+    dropzone?.addEventListener("drop", (e) => {
+        const file = e.dataTransfer?.files?.[0];
+        if (file) uploadFile(file);
+    });
+
     // Initialize
     checkApiHealth();
     fetchDocuments();
@@ -108,10 +134,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (session && session.user) {
             const email = session.user.email;
             authHeaderContainer.innerHTML = `
-                <div class="user-badge" title="${email}">
-                    <i class="fa-solid fa-user-check"></i>
-                    <span>${email}</span>
-                    <button id="btn-signout" class="icon-btn" style="width:22px; height:22px; font-size:0.75rem;" title="Sign Out">
+                <div class="user-badge" title="${escapeHtml(email)}">
+                    <span class="avatar-dot">${escapeHtml(email.charAt(0))}</span>
+                    <span>${escapeHtml(email)}</span>
+                    <button id="btn-signout" class="icon-btn" title="Sign out" aria-label="Sign out">
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
@@ -121,9 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         } else {
             authHeaderContainer.innerHTML = `
-                <button class="btn btn-primary btn-sm" id="btn-open-auth">
-                    <i class="fa-solid fa-user-lock"></i> Sign In / Register
-                </button>
+                <button class="btn btn-primary btn-sm" id="btn-open-auth">Sign in</button>
             `;
             document.getElementById("btn-open-auth")?.addEventListener("click", openAuthModal);
         }
@@ -143,9 +167,9 @@ document.addEventListener("DOMContentLoaded", () => {
         isSignUpMode = false;
         tabLogin.classList.add("active");
         tabSignup.classList.remove("active");
-        authModalTitle.innerHTML = `<i class="fa-solid fa-lock"></i> Welcome Back`;
-        authModalSubtitle.innerText = "Sign in to access AI document search & PDF indexing";
-        btnAuthSubmit.innerText = "Sign In";
+        authModalTitle.innerText = "Welcome back";
+        authModalSubtitle.innerText = "Sign in to upload and search your documents.";
+        btnAuthSubmit.innerText = "Sign in";
         showAuthAlert("", "");
     });
 
@@ -153,9 +177,9 @@ document.addEventListener("DOMContentLoaded", () => {
         isSignUpMode = true;
         tabSignup.classList.add("active");
         tabLogin.classList.remove("active");
-        authModalTitle.innerHTML = `<i class="fa-solid fa-user-plus"></i> Create Account`;
-        authModalSubtitle.innerText = "Register your email to unlock SAGE AI capabilities";
-        btnAuthSubmit.innerText = "Create Account";
+        authModalTitle.innerText = "Create an account";
+        authModalSubtitle.innerText = "Register with your email to start using SAGE.";
+        btnAuthSubmit.innerText = "Create account";
         showAuthAlert("", "");
     });
 
@@ -174,7 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         btnAuthSubmit.disabled = true;
-        btnAuthSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing...`;
+        btnAuthSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Working...`;
 
         try {
             if (isSignUpMode) {
@@ -198,7 +222,7 @@ document.addEventListener("DOMContentLoaded", () => {
             showAuthAlert(err.message || "Authentication failed", "error");
         } finally {
             btnAuthSubmit.disabled = false;
-            btnAuthSubmit.innerText = isSignUpMode ? "Create Account" : "Sign In";
+            btnAuthSubmit.innerText = isSignUpMode ? "Create account" : "Sign in";
         }
     });
 
@@ -223,7 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (res.ok) {
                 systemStatus.innerHTML = `
                     <span class="status-dot success"></span>
-                    <span class="status-text">Connected: Supabase Vector</span>
+                    <span class="status-text">Connected to vector database</span>
                 `;
             } else {
                 throw new Error("API Offline");
@@ -231,7 +255,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
             systemStatus.innerHTML = `
                 <span class="status-dot warning"></span>
-                <span class="status-text">API Offline (Click ⚙️ to set)</span>
+                <span class="status-text">Backend offline. Check settings.</span>
             `;
         }
     }
@@ -258,17 +282,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderDocumentList(docs) {
+        const docCount = document.getElementById("doc-count");
+        if (docCount) docCount.textContent = docs && docs.length ? `${docs.length} files` : "";
         if (!docs || docs.length === 0) {
-            documentList.innerHTML = `<div class="empty-docs">No documents indexed yet.</div>`;
+            documentList.innerHTML = `<div class="empty-docs">No documents yet. Upload a PDF to get started.</div>`;
             return;
         }
 
         documentList.innerHTML = docs.map(doc => `
-            <div class="doc-item">
-                <i class="fa-solid fa-file-pdf"></i>
-                <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    <strong>${doc.source}</strong><br>
-                    <span style="font-size:0.7rem; color:var(--text-muted);">${doc.chunk_count} vector chunks</span>
+            <div class="doc-item" title="${escapeHtml(doc.source)}">
+                <span class="doc-icon">PDF</span>
+                <div class="doc-meta">
+                    <strong>${escapeHtml(doc.source)}</strong>
+                    <span>${escapeHtml(doc.chunk_count)} chunks indexed</span>
                 </div>
             </div>
         `).join("");
@@ -278,11 +304,20 @@ document.addEventListener("DOMContentLoaded", () => {
     let conversationHistory = [];
 
     // PDF Upload Handler
-    pdfFileInput.addEventListener("change", async (e) => {
+    pdfFileInput.addEventListener("change", (e) => {
         const file = e.target.files[0];
-        if (!file) return;
+        if (file) uploadFile(file);
+        pdfFileInput.value = "";
+    });
 
-        uploadStatus.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Indexing into Supabase...`;
+    async function uploadFile(file) {
+        if (!file.name.toLowerCase().endsWith(".pdf")) {
+            uploadStatus.innerHTML = `<span class="err">Only PDF files are supported.</span>`;
+            setTimeout(() => { uploadStatus.innerHTML = ""; }, 6000);
+            return;
+        }
+        sidebar?.classList.add("open");
+        uploadStatus.innerHTML = `<span class="busy"><i class="fa-solid fa-spinner fa-spin"></i> Indexing ${escapeHtml(file.name)}...</span>`;
         
         const formData = new FormData();
         formData.append("file", file);
@@ -305,18 +340,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (res.ok) {
                 const result = await res.json();
-                uploadStatus.innerHTML = `<span style="color:#10b981;">✅ Indexed ${result.chunks_inserted} chunks!</span>`;
+                uploadStatus.innerHTML = `<span class="ok"><i class="fa-solid fa-check"></i> Indexed ${escapeHtml(result.chunks_inserted)} chunks from ${escapeHtml(file.name)}</span>`;
                 fetchDocuments();
             } else {
                 const errData = await res.json();
-                uploadStatus.innerHTML = `<span style="color:#ef4444;">❌ ${errData.detail || "Upload failed"}</span>`;
+                uploadStatus.innerHTML = `<span class="err">${escapeHtml(errData.detail || "Upload failed. Try again.")}</span>`;
             }
         } catch (err) {
-            uploadStatus.innerHTML = `<span style="color:#ef4444;">❌ Backend unreachable (Click ⚙️ to change endpoint)</span>`;
+            uploadStatus.innerHTML = `<span class="err">Can't reach the backend. It may be waking up, so try again in a minute.</span>`;
         }
 
         setTimeout(() => { uploadStatus.innerHTML = ""; }, 8000);
-    });
+    }
 
     // Chat Form Submit
     chatForm.addEventListener("submit", (e) => {
@@ -332,13 +367,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (welcomeScreen) {
             welcomeScreen.style.display = "none";
         }
+        mainContent?.classList.add("chatting");
+        setThinking(true);
 
         // Add User Message to UI and History
-        appendMessage("user", question);
+        appendMessage("user", escapeHtml(question));
         conversationHistory.push({ role: "user", content: question });
 
         // Add Bot Loading State
-        const loadingId = appendMessage("bot", `<i class="fa-solid fa-brain fa-fade"></i> Analyzing documents with LangChain Agent...`);
+        const loadingId = appendMessage("bot", `<span class="thinking"><span class="dots"><i></i><i></i><i></i></span> Searching your documents...</span>`);
 
         const headers = { "Content-Type": "application/json" };
         if (currentUserSession?.access_token) {
@@ -357,18 +394,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (res.ok) {
                 const data = await res.json();
-                conversationHistory.push({ role: "assistant", content: data.answer });
-                updateMessage(loadingId, data.answer, data.sources, data.tools_used);
+                if (data.mode === "error") {
+                    console.error("SAGE backend error:", data.answer);
+                    updateMessage(loadingId, null, null, null, "Something went wrong while answering. Try again, or rephrase the question.");
+                } else {
+                    conversationHistory.push({ role: "assistant", content: data.answer });
+                    updateMessage(loadingId, data.answer, data.sources, data.tools_used);
+                }
             } else {
-                updateMessage(loadingId, "⚠️ Error processing request from server.");
+                updateMessage(loadingId, null, null, null, "The server couldn't process that request. Try again in a moment.");
             }
         } catch (err) {
-            updateMessage(loadingId, "⚠️ Could not connect to SAGE API server. Please verify endpoint configuration.");
+            updateMessage(loadingId, null, null, null, "Can't reach the backend. It may be waking up, so try again in a minute.");
+        } finally {
+            setThinking(false);
         }
     }
 
+    let messageCounter = 0;
     function appendMessage(role, content) {
-        const msgId = "msg-" + Date.now();
+        const msgId = "msg-" + (++messageCounter);
         const isUser = role === "user";
         
         const row = document.createElement("div");
@@ -377,7 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         row.innerHTML = `
             <div class="avatar ${role}">
-                <i class="fa-solid ${isUser ? 'fa-user' : 'fa-brain'}"></i>
+                <i class="fa-solid ${isUser ? 'fa-user' : 'fa-feather-pointed'}"></i>
             </div>
             <div class="message-bubble">${content}</div>
         `;
@@ -387,11 +432,16 @@ document.addEventListener("DOMContentLoaded", () => {
         return msgId;
     }
 
-    function updateMessage(msgId, answerText, sources, toolsUsed) {
+    function updateMessage(msgId, answerText, sources, toolsUsed, errorText) {
         const row = document.getElementById(msgId);
         if (!row) return;
 
         const bubble = row.querySelector(".message-bubble");
+        if (errorText) {
+            bubble.innerHTML = `<p class="error-note">${escapeHtml(errorText)}</p>`;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return;
+        }
         
         let formattedText = "";
         if (typeof marked !== "undefined" && marked.parse) {
@@ -404,22 +454,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
         let toolsHtml = "";
         if (toolsUsed && toolsUsed.length > 0) {
-            const toolBadges = toolsUsed.map(t => `<span class="tool-badge"><i class="fa-solid fa-microchip"></i> ${t}</span>`).join(" ");
+            const toolBadges = toolsUsed.map(t => `<span class="tool-badge">${escapeHtml(t)}</span>`).join("");
             toolsHtml = `<div class="tools-execution-box">${toolBadges}</div>`;
         }
 
         let sourcesHtml = "";
         if (sources && sources.length > 0) {
+            // Group citations by file: "insulin.pdf · p. 2, 3, 6"
+            const byFile = new Map();
+            sources.forEach(src => {
+                const pages = byFile.get(src.source) || new Set();
+                pages.add(src.page);
+                byFile.set(src.source, pages);
+            });
             sourcesHtml = `
                 <div class="sources-box">
-                    <div class="sources-header">
-                        <i class="fa-solid fa-book-bookmark"></i> Evidence Sources (${sources.length})
+                    <div class="sources-header mono">Sources · ${sources.length}</div>
+                    <div class="source-list">
+                        ${[...byFile].map(([file, pages]) => `
+                            <span class="source-tag" title="${escapeHtml(file)}">
+                                <i class="fa-solid fa-file-pdf"></i>
+                                <strong>${escapeHtml(file)}</strong>
+                                <span>p. ${[...pages].sort((a, b) => a - b).map(escapeHtml).join(", ")}</span>
+                            </span>
+                        `).join("")}
                     </div>
-                    ${sources.map(src => `
-                        <div class="source-tag">
-                            📄 <strong>${src.source}</strong> (Page ${src.page})
-                        </div>
-                    `).join("")}
                 </div>
             `;
         }
@@ -437,6 +496,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnClearChat.addEventListener("click", () => {
         chatMessages.innerHTML = "";
         conversationHistory = [];
+        mainContent?.classList.remove("chatting");
         if (welcomeScreen) {
             welcomeScreen.style.display = "block";
             chatMessages.appendChild(welcomeScreen);
