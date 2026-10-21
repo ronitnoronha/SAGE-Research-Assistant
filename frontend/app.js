@@ -1,15 +1,15 @@
 // app.js - FRONTEND CONTROLLER FOR SAGE RESEARCH ASSISTANT WITH SUPABASE AUTH
 document.addEventListener("DOMContentLoaded", () => {
     // Configurable Backend API Endpoint
-    let apiBaseUrl = localStorage.getItem("sage_api_url") || 
+    let apiBaseUrl = localStorage.getItem("sage_api_url") ||
         (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
             ? "http://localhost:8000"
             : "https://sage-research-assistant.onrender.com");
 
     // Supabase Auth Client
     const SUPABASE_URL = "https://vvpstsihxzoselrunhwy.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2cHN0c2loeHpvc2VscnVuaHd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NDUxNjcsImV4cCI6MjEwMzMyMTE2N30.6sPtn9Dpl0T8wwHGyf15LOVwa4iwSfFxKXqR_ddFXvo";
-    
+    const SUPABASE_ANON_KEY = "sb_publishable_cD59VHq9A5zr5-yBmisaAA_dFZUXYBe";
+
     let supabaseClient = null;
     if (window.supabase) {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -318,7 +318,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         sidebar?.classList.add("open");
         uploadStatus.innerHTML = `<span class="busy"><i class="fa-solid fa-spinner fa-spin"></i> Indexing ${escapeHtml(file.name)}...</span>`;
-        
         const formData = new FormData();
         formData.append("file", file);
 
@@ -386,7 +385,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch(`${apiBaseUrl}/query`, {
                 method: "POST",
                 headers,
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     question,
                     chat_history: conversationHistory.slice(-6)
                 })
@@ -415,7 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function appendMessage(role, content) {
         const msgId = "msg-" + (++messageCounter);
         const isUser = role === "user";
-        
+
         const row = document.createElement("div");
         row.className = `message-row ${role}`;
         row.id = msgId;
@@ -442,7 +441,6 @@ document.addEventListener("DOMContentLoaded", () => {
             chatMessages.scrollTop = chatMessages.scrollHeight;
             return;
         }
-        
         let formattedText = "";
         if (typeof marked !== "undefined" && marked.parse) {
             formattedText = marked.parse(answerText);
