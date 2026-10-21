@@ -73,11 +73,6 @@ class SupabaseRAGService:
         embeddings = list(encoder.embed([text]))
         return [float(x) for x in embeddings[0]]
 
-    def encode_texts(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
-        """Embed many chunks in batches - far faster than one call per chunk"""
-        encoder = self.get_encoder()
-        return [[float(x) for x in vec] for vec in encoder.embed(texts, batch_size=batch_size)]
-
     def chunk_text(self, text: str, chunk_size: int = 800, overlap: int = 150) -> List[str]:
         """Split document text into overlapping chunks"""
         chunks = []
@@ -134,10 +129,10 @@ class SupabaseRAGService:
         if not all_records:
             raise ValueError("No readable text found in this PDF. Scanned image PDFs are not supported yet.")
 
-        print(f"🧮 Embedding {len(all_records)} chunks in batches...", flush=True)
-        embeddings = self.encode_texts([r["content"] for r in all_records])
-        for record, emb in zip(all_records, embeddings):
-            record["embedding"] = emb
+        # Embed one chunk at a time: batching gave no speed-up and pushed memory past Render's 512 MB limit
+        print(f"🧮 Embedding {len(all_records)} chunks...", flush=True)
+        for record in all_records:
+            record["embedding"] = self.encode_text(record["content"])
 
         # 3. Re-uploading a file replaces this user's previous copy instead of duplicating it
         self.client.table("documents").delete().eq("user_id", user_id).eq("metadata->>source", file_name).execute()
