@@ -331,7 +331,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         sidebar?.classList.add("open");
-        uploadStatus.innerHTML = `<span class="busy"><i class="fa-solid fa-spinner fa-spin"></i> Indexing ${escapeHtml(file.name)}...</span>`;
+        uploadStatus.innerHTML = `<span class="busy"><i class="fa-solid fa-spinner fa-spin"></i> Indexing ${escapeHtml(file.name)}... Large files can take a minute or two.</span>`;
         const formData = new FormData();
         formData.append("file", file);
 
@@ -342,7 +342,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000);
+            const timeoutId = setTimeout(() => controller.abort(), 300000);
             const res = await fetch(`${apiBaseUrl}/upload`, {
                 method: "POST",
                 headers,
@@ -356,11 +356,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 uploadStatus.innerHTML = `<span class="ok"><i class="fa-solid fa-check"></i> Indexed ${escapeHtml(result.chunks_inserted)} chunks from ${escapeHtml(file.name)}</span>`;
                 fetchDocuments();
             } else {
-                const errData = await res.json();
-                uploadStatus.innerHTML = `<span class="err">${escapeHtml(errData.detail || "Upload failed. Try again.")}</span>`;
+                const errData = await res.json().catch(() => ({}));
+                const detail = typeof errData.detail === "string" ? errData.detail : `Upload failed (error ${res.status}). Try again.`;
+                uploadStatus.innerHTML = `<span class="err">${escapeHtml(detail)}</span>`;
             }
         } catch (err) {
-            uploadStatus.innerHTML = `<span class="err">Can't reach the backend. It may be waking up, so try again in a minute.</span>`;
+            const msg = err.name === "AbortError"
+                ? "Indexing is taking longer than 5 minutes. Try a smaller PDF."
+                : "Can't reach the backend. It may be waking up, so try again in a minute.";
+            uploadStatus.innerHTML = `<span class="err">${msg}</span>`;
         }
 
         setTimeout(() => { uploadStatus.innerHTML = ""; }, 8000);

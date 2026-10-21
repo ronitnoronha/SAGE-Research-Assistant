@@ -3,6 +3,7 @@ import os
 import traceback
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
@@ -25,6 +26,8 @@ ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", DEFAULT_ORIGI
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    # Netlify deploy previews and branch deploys, e.g. deploy-preview-3--neon-alfajores-a16cfc.netlify.app
+    allow_origin_regex=os.getenv("ALLOWED_ORIGIN_REGEX", r"https://([a-z0-9-]+--)?neon-alfajores-a16cfc\.netlify\.app"),
     allow_credentials=False,  # auth uses a Bearer header, not cookies
     allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type"],
@@ -83,11 +86,12 @@ async def upload_pdf(file: UploadFile = File(...), user=Depends(require_user)):
     contents = await file.read()
     if len(contents) > MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"That file is too large. The limit is {MAX_UPLOAD_MB} MB.")
-    if not contents.startswith(b"%PDF"):
+    if b"%PDF" not in contents[:1024]:
         raise HTTPException(status_code=400, detail="That file isn't a valid PDF.")
 
     try:
-        return rag_service.process_and_upload_pdf(file_name, contents, user_id=str(user.id))
+        # Indexing is CPU-heavy; run it off the event loop so /health and other requests stay responsive
+        return await run_in_threadpool(rag_service.process_and_upload_pdf, file_name, contents, user_id=str(user.id))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
