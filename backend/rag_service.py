@@ -84,15 +84,15 @@ class SupabaseRAGService:
             start += chunk_size - overlap
         return chunks
 
-    def process_and_upload_pdf(self, file_name: str, file_bytes: bytes) -> Dict[str, Any]:
-        """Process PDF bytes, extract chunks, compute embeddings & insert into Supabase"""
+    def process_and_upload_pdf(self, file_name: str, file_bytes: bytes, user_id: str) -> Dict[str, Any]:
+        """Process PDF bytes, extract chunks, compute embeddings & insert into Supabase for one user"""
         if not self.client:
             raise RuntimeError("Supabase client not configured. Set SUPABASE_URL and SUPABASE_KEY.")
 
-        # 1. Upload PDF to Supabase Storage Bucket ('research_papers')
+        # 1. Upload PDF to Supabase Storage under the user's own folder, so users can't overwrite each other
         try:
             self.client.storage.from_("research_papers").upload(
-                file_name,
+                f"{user_id}/{file_name}",
                 file_bytes,
                 file_options={"content-type": "application/pdf", "upsert": "true"}
             )
@@ -123,11 +123,18 @@ class SupabaseRAGService:
                         "chunk_index": chunk_idx,
                         "total_pages": total_pages
                     },
-                    "embedding": emb
+                    "embedding": emb,
+                    "user_id": user_id
                 }
                 all_records.append(record)
 
-        # 3. Batch Insert into Supabase table 'documents'
+        if not all_records:
+            raise ValueError("No readable text found in this PDF. Scanned image PDFs are not supported yet.")
+
+        # 3. Re-uploading a file replaces this user's previous copy instead of duplicating it
+        self.client.table("documents").delete().eq("user_id", user_id).eq("metadata->>source", file_name).execute()
+
+        # 4. Batch Insert into Supabase table 'documents'
         batch_size = 50
         for i in range(0, len(all_records), batch_size):
             batch = all_records[i:i + batch_size]
@@ -146,7 +153,7 @@ class SupabaseRAGService:
     # 3. LangChain Tools Definitions
     # ==========================================
 
-    def search_documents(self, query: str, match_count: int = 5) -> List[Dict[str, Any]]:
+    def search_documents(self, query: str, user_id: str, match_count: int = 5) -> List[Dict[str, Any]]:
         """Vector similarity retrieval over Supabase pgvector"""
         if not self.client:
             return []
@@ -163,9 +170,10 @@ class SupabaseRAGService:
             try:
                 emb = self.encode_text(q)
                 rpc_res = self.client.rpc(
-                    "match_documents",
+                    "match_user_documents",
                     {
                         "query_embedding": emb,
+                        "filter_user_id": user_id,
                         "match_threshold": 0.15,
                         "match_count": match_count
                     }
@@ -195,12 +203,12 @@ class SupabaseRAGService:
         except Exception as e:
             return f"Calculation Error on '{expression}': {str(e)}"
 
-    def list_documents(self) -> List[Dict[str, Any]]:
-        """List distinct documents stored in Supabase"""
+    def list_documents(self, user_id: str) -> List[Dict[str, Any]]:
+        """List distinct documents this user has stored in Supabase"""
         if not self.client:
             return []
         try:
-            res = self.client.table("documents").select("metadata").execute()
+            res = self.client.table("documents").select("metadata").eq("user_id", user_id).execute()
             docs = {}
             for item in (res.data or []):
                 meta = item.get("metadata", {})
@@ -293,10 +301,25 @@ STANDALONE SEARCH QUERY:"""
     # 5. Autonomous Query RAG Engine
     # ==========================================
 
-    def query_rag(self, question: str, chat_history: Optional[List[Dict[str, str]]] = None, match_count: int = 5) -> Dict[str, Any]:
+    SMALL_TALK = re.compile(
+        r"^\s*(hi+|hey+|hello+|yo|hola|namaste|good (morning|afternoon|evening)|thanks?( you)?|thank you|ok(ay)?|cool|bye|how are you\??)[\s!.?]*$",
+        re.IGNORECASE,
+    )
+
+    def query_rag(self, question: str, user_id: str, chat_history: Optional[List[Dict[str, str]]] = None, match_count: int = 5) -> Dict[str, Any]:
         """Execute Agentic RAG with multi-turn memory, vector search, and structured output"""
         if not self.client:
             raise RuntimeError("Supabase client not configured.")
+
+        # Greetings and small talk don't need a document search
+        if self.SMALL_TALK.match(question):
+            return {
+                "answer": "Hi! Ask me anything about the documents in your library, or upload a PDF to get started.",
+                "key_findings": [],
+                "sources": [],
+                "tools_used": [],
+                "mode": "small_talk"
+            }
 
         tools_used = []
 
@@ -306,7 +329,7 @@ STANDALONE SEARCH QUERY:"""
             tools_used.append(f"query_rephrased: '{standalone_query}'")
 
         # Step 2: Retrieve relevant vector chunks (Retrieval)
-        matches_to_use = self.search_documents(standalone_query, match_count=match_count)
+        matches_to_use = self.search_documents(standalone_query, user_id, match_count=match_count)
         tools_used.append("supabase_vector_search")
 
         if not matches_to_use:

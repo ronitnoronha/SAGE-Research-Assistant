@@ -108,14 +108,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (file) uploadFile(file);
     });
 
-    // Initialize
+    // Initialize (the library loads once the auth session is known)
     checkApiHealth();
-    fetchDocuments();
     initAuthSession();
 
     // Initialize Auth Session
     async function initAuthSession() {
-        if (!supabaseClient) return;
+        if (!supabaseClient) { fetchDocuments(); return; }
 
         try {
             const { data: { session } } = await supabaseClient.auth.getSession();
@@ -130,7 +129,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function updateAuthUI(session) {
+        const previousToken = currentUserSession?.access_token;
         currentUserSession = session;
+        if (session?.access_token !== previousToken || !session) fetchDocuments();
         if (session && session.user) {
             const email = session.user.email;
             authHeaderContainer.innerHTML = `
@@ -262,6 +263,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Fetch Indexed Documents
     async function fetchDocuments() {
+        if (!currentUserSession?.access_token) {
+            renderDocumentList(null);
+            return;
+        }
         try {
             const headers = {};
             if (currentUserSession?.access_token) {
@@ -284,7 +289,11 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderDocumentList(docs) {
         const docCount = document.getElementById("doc-count");
         if (docCount) docCount.textContent = docs && docs.length ? `${docs.length} files` : "";
-        if (!docs || docs.length === 0) {
+        if (!docs) {
+            documentList.innerHTML = `<div class="empty-docs">Sign in to see your library.</div>`;
+            return;
+        }
+        if (docs.length === 0) {
             documentList.innerHTML = `<div class="empty-docs">No documents yet. Upload a PDF to get started.</div>`;
             return;
         }
@@ -311,6 +320,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     async function uploadFile(file) {
+        if (!currentUserSession) {
+            openAuthModal();
+            showAuthAlert("Sign in to upload documents.", "error");
+            return;
+        }
         if (!file.name.toLowerCase().endsWith(".pdf")) {
             uploadStatus.innerHTML = `<span class="err">Only PDF files are supported.</span>`;
             setTimeout(() => { uploadStatus.innerHTML = ""; }, 6000);
@@ -363,6 +377,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     async function sendQuestion(question) {
+        if (!currentUserSession) {
+            openAuthModal();
+            showAuthAlert("Sign in to ask questions about your documents.", "error");
+            return;
+        }
         if (welcomeScreen) {
             welcomeScreen.style.display = "none";
         }
@@ -400,6 +419,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     conversationHistory.push({ role: "assistant", content: data.answer });
                     updateMessage(loadingId, data.answer, data.sources, data.tools_used);
                 }
+            } else if (res.status === 401) {
+                updateMessage(loadingId, null, null, null, "Your session has expired. Please sign in again.");
+                openAuthModal();
             } else {
                 updateMessage(loadingId, null, null, null, "The server couldn't process that request. Try again in a moment.");
             }
@@ -442,10 +464,11 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         let formattedText = "";
-        if (typeof marked !== "undefined" && marked.parse) {
-            formattedText = marked.parse(answerText);
+        if (typeof marked !== "undefined" && marked.parse && window.DOMPurify) {
+            // Answers can echo text from uploaded PDFs, so strip scripts, event handlers and iframes
+            formattedText = DOMPurify.sanitize(marked.parse(answerText));
         } else {
-            formattedText = answerText
+            formattedText = escapeHtml(answerText)
                 .replace(/\n\n/g, "<br><br>")
                 .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
         }

@@ -50,3 +50,5 @@ $$;
 
 -- 5. Storage setup policy note
 -- Note: Create a public storage bucket named 'research_papers' in the Supabase Dashboard.
+
+-- 6. Then run migrations/002_per_user_library.sql to add per-user ownership and Row Level Security.

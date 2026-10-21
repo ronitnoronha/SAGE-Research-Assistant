@@ -40,18 +40,20 @@ SAGE-Research-Assistant/
    - Click on the **SQL Editor** tab in the left sidebar.
    - Click **New Query**.
    - Copy and paste the contents of `supabase/schema.sql` into the SQL editor and click **Run**.
+   - Then run `supabase/migrations/002_per_user_library.sql` the same way. It gives every user a private library and turns on Row Level Security.
    - *This enables `pgvector`, creates the `documents` table, and sets up the `match_documents` vector search function.*
 
 3. **Create Storage Bucket for Research PDFs:**
    - Click on **Storage** in the left sidebar.
    - Click **New bucket**.
    - Name the bucket: `research_papers`.
-   - Enable **Public bucket** (or set up bucket policy) so papers can be uploaded and viewed.
+   - Leave it **private**. The backend uploads with the secret key, and files are stored under each user's own folder.
 
 4. **Copy API Credentials:**
    - Go to **Project Settings** -> **API**.
    - Copy your **Project URL** (e.g. `https://xxxx.supabase.co`).
-   - Copy your **`anon` public key** (or `service_role` key for administrative backend access).
+   - Copy your **publishable key** (`sb_publishable_...`) for the frontend and your **secret key** (`sb_secret_...`) for the backend.
+   - Never commit the secret key. Put it only in Render's environment variables or a local `.env` file (already git-ignored).
 
 ---
 
@@ -66,13 +68,14 @@ Since Netlify hosts static frontends, the Python FastAPI backend is hosted on a 
    - Go to [https://render.com](https://render.com) and log in.
    - Click **New +** -> **Web Service**.
    - Connect your GitHub repository.
-   - Set **Root Directory**: `SAGE-Research-Assistant/backend`
+   - Set **Root Directory**: `backend`
    - Set **Build Command**: `pip install -r requirements.txt`
    - Set **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
 
 3. **Add Environment Variables in Render:**
    - `SUPABASE_URL`: *Your Supabase Project URL*
-   - `SUPABASE_KEY`: *Your Supabase Anon / Service Role Key*
+   - `SUPABASE_KEY`: *Your Supabase secret key (`sb_secret_...`)*
+   - `ALLOWED_ORIGINS` *(optional)*: comma-separated frontend URLs allowed to call the API. Defaults to the Netlify site and localhost.
    - `GEMINI_API_KEY`: *(Optional) Your Google Gemini API Key for AI responses*
 
 4. **Get Backend API URL:**
