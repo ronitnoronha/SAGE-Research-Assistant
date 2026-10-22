@@ -304,8 +304,10 @@ STANDALONE SEARCH QUERY:"""
     # 5. Autonomous Query RAG Engine
     # ==========================================
 
+    NOT_FOUND = "NOT_IN_DOCUMENTS"
+
     SMALL_TALK = re.compile(
-        r"^\s*(hi+|hey+|hello+|yo|hola|namaste|good (morning|afternoon|evening)|thanks?( you)?|thank you|ok(ay)?|cool|bye|how are you\??)[\s!.?]*$",
+        r"^\s*(h+i+|he+y+|he+l+o+|hii+ya|yo+|hola|namaste|good (morning|afternoon|evening)|thanks?( you)?|thank you|ty|ok(ay)?|cool|bye|how are you\??)(\s+(there|sage))?[\s!.?]*$",
         re.IGNORECASE,
     )
 
@@ -381,6 +383,7 @@ INSTRUCTIONS:
 3. If the context does not contain enough information to fully answer the question, clearly state what information is available and what is missing.
 4. Structure the response clearly with logical sections or bullet points when appropriate.
 5. Provide ONLY the final answer. DO NOT include any self-checks, verification steps, instruction checklists, thinking process, or meta-notes in your response.
+6. If the document context contains nothing at all relevant to the question, reply with exactly {self.NOT_FOUND} and nothing else.
 
 ANSWER:"""
 
@@ -485,6 +488,16 @@ ANSWER:"""
                     except Exception as e:
                         print(f"⚠️ Gemini call failed for {model_name}: {e}", flush=True)
                         continue
+
+        # The model found nothing relevant: say so plainly and don't cite unrelated pages
+        if answer and self.NOT_FOUND in answer and len(answer.strip()) < len(self.NOT_FOUND) + 40:
+            return {
+                "answer": "I couldn't find anything about that in your documents. Try rephrasing, or upload a PDF that covers it.",
+                "key_findings": [],
+                "sources": [],
+                "tools_used": tools_used,
+                "mode": "not_in_documents"
+            }
 
         # Provider 3: Extractive Fallback
         if not answer:
